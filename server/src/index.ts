@@ -5,6 +5,7 @@ import fs from 'fs';
 import dotenv from 'dotenv';
 import authRoutes from './routes/auth';
 import receiptsRoutes from './routes/receipts';
+import analyticsRoutes from './routes/analytics';
 
 dotenv.config();
 
@@ -29,6 +30,7 @@ app.use('/uploads', express.static(uploadsDir));
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/receipts', receiptsRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 // Health check route
 app.get('/api/health', (_req: Request, res: Response) => {

@@ -5,6 +5,7 @@ export interface ParsedItem {
   unitPrice: number;
   quantity: number;
   totalPrice: number;
+  itemNumber?: string;
 }
 
 export interface ParsedReceiptData {
@@ -16,6 +17,7 @@ export interface ParsedReceiptData {
   purchaseDate: Date;
   totalAmount: number;
   items: ParsedItem[];
+  rawText?: string; // For debugging
 }
 
 class OCRService {
@@ -23,7 +25,6 @@ class OCRService {
 
   constructor() {
     try {
-      // Initialize with credentials from environment variable
       this.visionClient = new ImageAnnotatorClient({
         keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS,
       });
@@ -52,7 +53,6 @@ class OCRService {
         return '';
       }
 
-      // First annotation contains the full text
       const fullText = textAnnotations[0].description || '';
       console.log(`Extracted ${fullText.length} characters from image`);
 
@@ -68,6 +68,9 @@ class OCRService {
    */
   parseReceiptText(text: string): ParsedReceiptData {
     console.log('Parsing receipt text...');
+    console.log('--- RAW OCR TEXT ---');
+    console.log(text);
+    console.log('--- END RAW TEXT ---');
 
     const result: ParsedReceiptData = {
       storeName: 'Costco',
@@ -78,6 +81,7 @@ class OCRService {
       purchaseDate: new Date(),
       totalAmount: 0,
       items: [],
+      rawText: text,
     };
 
     if (!text || text.trim().length === 0) {
@@ -85,104 +89,350 @@ class OCRService {
       return result;
     }
 
-    const lines = text.split('\n').map(line => line.trim());
+    const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
 
     // Extract store name
-    const storeNameMatch = text.match(/COSTCO\s*WHOLESALE/i);
-    if (storeNameMatch) {
+    if (/COSTCO\s*WHOLESALE/i.test(text)) {
       result.storeName = 'Costco Wholesale';
       console.log('Found store name: Costco Wholesale');
     }
 
-    // Extract store address
-    // Pattern: street number, street name, city, state (2 letters), ZIP (5 digits)
-    const addressRegex = /(\d+)\s+([A-Za-z\s]+?)[\s,]+([A-Za-z\s]+?)[\s,]+([A-Z]{2})[\s,]+(\d{5})/i;
-    const addressMatch = text.match(addressRegex);
-    if (addressMatch) {
-      result.storeLocation = `${addressMatch[1]} ${addressMatch[2].trim()}`;
-      result.storeCity = addressMatch[3].trim();
-      result.storeState = addressMatch[4].toUpperCase();
-      result.storeZip = addressMatch[5];
-      console.log(`Found address: ${result.storeLocation}, ${result.storeCity}, ${result.storeState} ${result.storeZip}`);
-    }
+    // Extract store address - look for pattern with street number and ZIP
+    this.extractAddress(lines, result);
 
-    // Extract purchase date
-    const dateRegex = /(\d{1,2}\/\d{1,2}\/\d{2,4})/;
-    const dateMatch = text.match(dateRegex);
-    if (dateMatch) {
-      const parsedDate = new Date(dateMatch[1]);
-      if (!isNaN(parsedDate.getTime())) {
-        result.purchaseDate = parsedDate;
-        console.log(`Found purchase date: ${parsedDate.toISOString()}`);
+    // Extract purchase date - look for MM/DD/YYYY or MM/DD/YY format
+    this.extractDate(text, result);
+
+    // Extract items - Costco items typically have item number and price
+    this.extractItems(lines, result);
+
+    // Extract total amount
+    this.extractTotal(text, result);
+
+    console.log(`Parsing complete: ${result.items.length} items found, total: $${result.totalAmount}`);
+    return result;
+  }
+
+  /**
+   * Extract store address from receipt lines
+   */
+  private extractAddress(lines: string[], result: ParsedReceiptData): void {
+    // Look for address patterns in the first 10 lines (usually near the top)
+    const headerLines = lines.slice(0, 15);
+
+    // Pattern 1: Full address on one line - "123 MAIN ST CITY, ST 12345"
+    const fullAddressRegex = /^(\d+\s+[A-Z0-9\s]+(?:ST|AVE|BLVD|DR|RD|WAY|LN|CT|PL|PKWY|HWY)\.?)\s*,?\s*([A-Z\s]+),?\s*([A-Z]{2})\s*(\d{5}(?:-\d{4})?)/i;
+
+    // Pattern 2: Street address with city/state/zip on separate lines
+    const streetRegex = /^(\d+\s+[A-Z0-9\s]+(?:ST|AVE|BLVD|DR|RD|WAY|LN|CT|PL|PKWY|HWY)\.?)$/i;
+    const cityStateZipRegex = /^([A-Z][A-Z\s]+),?\s*([A-Z]{2})\s*(\d{5}(?:-\d{4})?)$/i;
+
+    for (let i = 0; i < headerLines.length; i++) {
+      const line = headerLines[i];
+
+      // Try full address on one line
+      const fullMatch = line.match(fullAddressRegex);
+      if (fullMatch) {
+        result.storeLocation = fullMatch[1].trim();
+        result.storeCity = fullMatch[2].trim();
+        result.storeState = fullMatch[3].toUpperCase();
+        result.storeZip = fullMatch[4];
+        console.log(`Found address: ${result.storeLocation}, ${result.storeCity}, ${result.storeState} ${result.storeZip}`);
+        return;
+      }
+
+      // Try street address followed by city/state/zip
+      const streetMatch = line.match(streetRegex);
+      if (streetMatch && i + 1 < headerLines.length) {
+        const nextLine = headerLines[i + 1];
+        const cityMatch = nextLine.match(cityStateZipRegex);
+        if (cityMatch) {
+          result.storeLocation = streetMatch[1].trim();
+          result.storeCity = cityMatch[1].trim();
+          result.storeState = cityMatch[2].toUpperCase();
+          result.storeZip = cityMatch[3];
+          console.log(`Found address: ${result.storeLocation}, ${result.storeCity}, ${result.storeState} ${result.storeZip}`);
+          return;
+        }
       }
     }
 
-    // Extract line items
-    // Costco format variations: "ITEM NAME    QTY    PRICE" or "ITEM NAME    PRICE"
-    const itemRegex = /^(.+?)\s+(\d+)\s+\$?([\d,]+\.?\d{0,2})$/;
-    const singleItemRegex = /^(.+?)\s+\$?([\d,]+\.\d{2})$/;
+    // Fallback: Look for any ZIP code pattern
+    const zipMatch = lines.slice(0, 15).join(' ').match(/([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?),?\s*([A-Z]{2})\s+(\d{5})/);
+    if (zipMatch) {
+      result.storeCity = zipMatch[1].trim();
+      result.storeState = zipMatch[2].toUpperCase();
+      result.storeZip = zipMatch[3];
+      console.log(`Found partial address: ${result.storeCity}, ${result.storeState} ${result.storeZip}`);
+    }
+  }
 
-    for (const line of lines) {
-      // Try quantity format first
-      let match = line.match(itemRegex);
+  /**
+   * Extract purchase date from receipt text
+   */
+  private extractDate(text: string, result: ParsedReceiptData): void {
+    // Try various date formats
+    const datePatterns = [
+      /(\d{1,2})\/(\d{1,2})\/(\d{4})/,  // MM/DD/YYYY
+      /(\d{1,2})\/(\d{1,2})\/(\d{2})(?!\d)/, // MM/DD/YY
+      /(\d{1,2})-(\d{1,2})-(\d{4})/, // MM-DD-YYYY
+      /(\d{1,2})-(\d{1,2})-(\d{2})(?!\d)/, // MM-DD-YY
+    ];
+
+    for (const pattern of datePatterns) {
+      const match = text.match(pattern);
       if (match) {
-        const name = match[1].trim();
-        const quantity = parseInt(match[2], 10);
-        const totalPrice = parseFloat(match[3].replace(',', ''));
-        const unitPrice = totalPrice / quantity;
+        let year = parseInt(match[3], 10);
+        if (year < 100) {
+          year += 2000; // Convert 2-digit year to 4-digit
+        }
+        const month = parseInt(match[1], 10) - 1; // JS months are 0-indexed
+        const day = parseInt(match[2], 10);
 
-        // Skip if name too short or price too low (likely discounts/fees)
-        if (name.length >= 3 && unitPrice >= 0.50) {
+        const parsedDate = new Date(year, month, day);
+        if (!isNaN(parsedDate.getTime())) {
+          result.purchaseDate = parsedDate;
+          console.log(`Found purchase date: ${parsedDate.toLocaleDateString()}`);
+          return;
+        }
+      }
+    }
+  }
+
+  /**
+   * Extract items from receipt lines
+   * Costco format: Item number + name on one line, price on the NEXT line
+   * Example:
+   *   1954841 IRIS BIN
+   *   11.99 A
+   */
+  private extractItems(lines: string[], result: ParsedReceiptData): void {
+    // Lines to skip - these are not product items
+    const skipPatterns = [
+      /^COSTCO/i,
+      /^WHOLESALE/i,
+      /^SUBTOTAL$/i,
+      /^TAX$/i,
+      /^\*+\s*TOTAL/i,
+      /^TOTAL\s/i,
+      /BALANCE/i,
+      /^CHANGE$/i,
+      /APPROVED/i,
+      /VISA/i,
+      /MASTER\s*CARD/i,
+      /^MEMBER/i,
+      /^\d{12,}/, // Long numbers (member IDs, barcodes)
+      /^0{4,}\d+\s*\//, // Barcode lines like "0000366341 / 1935001"
+      /TERMINAL/i,
+      /TRANS\s*ID/i,
+      /APPROVAL/i,
+      /RECEIPT/i,
+      /THANK\s*YOU/i,
+      /PLEASE\s*COME/i,
+      /^\d{1,2}\/\d{1,2}\/\d{2,4}/, // Date lines
+      /^#\d+/, // Store numbers like #388
+      /WAREHOUSE/i,
+      /SELF.?CHECKOUT/i,
+      /^AID:/i,
+      /^Seq#/i,
+      /^App#/i,
+      /^Resp:/i,
+      /^Tran\s*ID/i,
+      /AMOUNT:/i,
+      /^OP#:/i,
+      /^Whse:/i,
+      /Items\s*Sold/i,
+      /INSTANT\s*SAVINGS/i,
+      /SEASONS\s*GREETINGS/i,
+      /HAPPY\s*HOLIDAYS/i,
+      /^\d{10,}$/, // Long number-only lines
+      /^[A-Z]\s+\d+\.?\d*%/i, // Tax rate lines like "A 7.5% Tax"
+      /TOTAL\s*TAX/i,
+      /TOTAL\s*NUMBER/i,
+      /Date\s*of\s*Birth/i,
+      /^Name:/i,
+      /^XX+/i, // Masked card numbers
+    ];
+
+    // Pattern for item line: starts with item number (4-7 digits/letters), followed by name
+    const itemLineRegex = /^(\d{4,7}[A-Z]?)\s+(.+)$/i;
+
+    // Pattern for price line: price followed by optional tax code (A, E, F, etc.)
+    const priceLineRegex = /^(\d+\.\d{2})\s*([A-Z])?\s*$/;
+
+    // Pattern for discount line: negative price like "8.00-A"
+    const discountLineRegex = /^(\d+\.\d{2})-([A-Z])?\s*$/;
+
+    // Pattern for item with price on same line
+    const itemWithPriceRegex = /^(\d{4,7}[A-Z]?)\s+(.+?)\s+(\d+\.\d{2})\s*([A-Z])?\s*$/i;
+
+    let pendingItem: { itemNumber: string; name: string } | null = null;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+
+      // Skip empty lines
+      if (!line || line.length < 2) {
+        continue;
+      }
+
+      // Skip non-item lines
+      if (skipPatterns.some(pattern => pattern.test(line))) {
+        pendingItem = null;
+        continue;
+      }
+
+      // Check if this is a price line (for the pending item)
+      const priceMatch = line.match(priceLineRegex);
+      if (priceMatch && pendingItem) {
+        const price = parseFloat(priceMatch[1]);
+        if (price >= 0.01 && price < 10000) {
           result.items.push({
-            name,
-            unitPrice: Math.round(unitPrice * 100) / 100,
-            quantity,
-            totalPrice,
+            itemNumber: pendingItem.itemNumber,
+            name: pendingItem.name,
+            unitPrice: price,
+            quantity: 1,
+            totalPrice: price,
           });
-          console.log(`Found item: ${name} x${quantity} = $${totalPrice}`);
+          console.log(`Found item: [${pendingItem.itemNumber}] ${pendingItem.name} = $${price}`);
+        }
+        pendingItem = null;
+        continue;
+      }
+
+      // Check for discount line (applies to last item)
+      const discountMatch = line.match(discountLineRegex);
+      if (discountMatch && result.items.length > 0) {
+        const discount = parseFloat(discountMatch[1]);
+        const lastItem = result.items[result.items.length - 1];
+        lastItem.totalPrice = Math.round((lastItem.totalPrice - discount) * 100) / 100;
+        lastItem.unitPrice = lastItem.totalPrice / lastItem.quantity;
+        console.log(`Applied discount: -$${discount} to ${lastItem.name}`);
+        continue;
+      }
+
+      // Check for item with price on same line
+      const itemWithPriceMatch = line.match(itemWithPriceRegex);
+      if (itemWithPriceMatch) {
+        const itemNumber = itemWithPriceMatch[1];
+        const name = this.cleanItemName(itemWithPriceMatch[2]);
+        const price = parseFloat(itemWithPriceMatch[3]);
+
+        if (name.length >= 2 && price >= 0.01 && price < 10000) {
+          result.items.push({
+            itemNumber,
+            name,
+            unitPrice: price,
+            quantity: 1,
+            totalPrice: price,
+          });
+          console.log(`Found item (inline): [${itemNumber}] ${name} = $${price}`);
+        }
+        pendingItem = null;
+        continue;
+      }
+
+      // Check if this is an item line (number + name, price on next line)
+      const itemMatch = line.match(itemLineRegex);
+      if (itemMatch) {
+        const itemNumber = itemMatch[1];
+        const name = this.cleanItemName(itemMatch[2]);
+
+        if (name.length >= 2) {
+          // Store as pending, wait for price on next line
+          pendingItem = { itemNumber, name };
         }
         continue;
       }
 
-      // Try single item format (quantity = 1)
-      match = line.match(singleItemRegex);
-      if (match) {
-        const name = match[1].trim();
-        const totalPrice = parseFloat(match[2].replace(',', ''));
+      // Reset pending if we encounter something unexpected
+      pendingItem = null;
+    }
+  }
 
-        // Skip common non-item lines
-        const skipPatterns = ['SUBTOTAL', 'TAX', 'TOTAL', 'CHANGE', 'CASH', 'CREDIT', 'DEBIT', 'VISA', 'MASTERCARD', 'MEMBER'];
-        const shouldSkip = skipPatterns.some(pattern =>
-          name.toUpperCase().includes(pattern)
-        );
+  /**
+   * Clean up item name by removing item numbers and extra whitespace
+   */
+  private cleanItemName(name: string): string {
+    return name
+      .replace(/^\d{5,7}\s*/, '') // Remove leading item numbers
+      .replace(/\s+/g, ' ')       // Normalize whitespace
+      .replace(/^[A-Z]\s+/, '')   // Remove single letter prefixes
+      .trim();
+  }
 
-        if (!shouldSkip && name.length >= 3 && totalPrice >= 0.50) {
-          result.items.push({
-            name,
-            unitPrice: totalPrice,
-            quantity: 1,
-            totalPrice,
-          });
-          console.log(`Found item: ${name} x1 = $${totalPrice}`);
+  /**
+   * Check if a line looks like metadata rather than a product
+   */
+  private isMetadataLine(text: string): boolean {
+    const metadataPatterns = [
+      /^\d+\/\d+\/\d+/, // Dates
+      /^\d+:\d+/, // Times
+      /^[#*]+/, // Special characters
+      /^\d+\s+\d+\s+\d+/, // Multiple numbers (could be transaction info)
+      /REG(ISTER)?/i,
+      /CASHIER/i,
+      /OP(ERATOR)?(\s|$)/i,
+      /TRN/i,
+    ];
+
+    return metadataPatterns.some(pattern => pattern.test(text));
+  }
+
+  /**
+   * Extract total amount from receipt text
+   */
+  private extractTotal(text: string, result: ParsedReceiptData): void {
+    const lines = text.split('\n').map(l => l.trim());
+
+    // Look for AMOUNT: $XXX.XX pattern (most reliable for Costco)
+    const amountMatch = text.match(/AMOUNT:\s*\$?(\d+\.\d{2})/i);
+    if (amountMatch) {
+      result.totalAmount = parseFloat(amountMatch[1]);
+      console.log(`Found total from AMOUNT: $${result.totalAmount}`);
+      return;
+    }
+
+    // Look for **** TOTAL followed by card number, then amount
+    // Pattern in Costco receipts:
+    //   **** TOTAL
+    //   XXXXXXXXXXXX5089
+    //   407.23
+    for (let i = 0; i < lines.length; i++) {
+      if (/^\*+\s*TOTAL/i.test(lines[i])) {
+        // Look for price in the next few lines (skip masked card number)
+        for (let j = i + 1; j < Math.min(i + 4, lines.length); j++) {
+          const priceMatch = lines[j].match(/^(\d+\.\d{2})$/);
+          if (priceMatch) {
+            result.totalAmount = parseFloat(priceMatch[1]);
+            console.log(`Found total after TOTAL marker: $${result.totalAmount}`);
+            return;
+          }
         }
       }
     }
 
-    // Extract total amount
-    const totalRegex = /TOTAL[:\s]+\$?([\d,]+\.?\d{0,2})/i;
-    const totalMatch = text.match(totalRegex);
-    if (totalMatch) {
-      result.totalAmount = parseFloat(totalMatch[1].replace(',', ''));
-      console.log(`Found total: $${result.totalAmount}`);
-    } else if (result.items.length > 0) {
-      // Calculate total from items if not found
+    // Look for various total patterns
+    const totalPatterns = [
+      /TOTAL\s+\$?\s*(\d+\.\d{2})/i,                     // TOTAL $XX.XX
+      /BALANCE\s+DUE\s+\$?\s*(\d+\.\d{2})/i,            // BALANCE DUE $XX.XX
+    ];
+
+    for (const pattern of totalPatterns) {
+      const match = text.match(pattern);
+      if (match) {
+        result.totalAmount = parseFloat(match[1]);
+        console.log(`Found total: $${result.totalAmount}`);
+        return;
+      }
+    }
+
+    // Fallback: Calculate from items
+    if (result.items.length > 0) {
       result.totalAmount = result.items.reduce((sum, item) => sum + item.totalPrice, 0);
       result.totalAmount = Math.round(result.totalAmount * 100) / 100;
       console.log(`Calculated total from items: $${result.totalAmount}`);
     }
-
-    console.log(`Parsing complete: ${result.items.length} items found, total: $${result.totalAmount}`);
-    return result;
   }
 
   /**
@@ -192,7 +442,6 @@ class OCRService {
     try {
       console.log('Processing receipt image...');
 
-      // Extract text from image
       const text = await this.extractText(imageBuffer);
 
       if (!text) {
@@ -200,7 +449,6 @@ class OCRService {
         return this.getDefaultReceiptData();
       }
 
-      // Parse the extracted text
       const parsedData = this.parseReceiptText(text);
 
       console.log('Receipt processing complete');
@@ -228,7 +476,5 @@ class OCRService {
   }
 }
 
-// Export singleton instance
 export const ocrService = new OCRService();
-
 export default ocrService;
