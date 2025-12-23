@@ -421,6 +421,97 @@ router.post('/save-guest', authenticate, async (req: Request, res: Response): Pr
   }
 });
 
+// PUT /api/receipts/:id/items/:itemId - Update an item
+router.put('/:id/items/:itemId', authenticate, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
+    const { id, itemId } = req.params;
+    const { name, unitPrice, quantity, category } = req.body;
+
+    // Verify receipt belongs to user
+    const receipt = await ReceiptModel.findById(id, userId);
+    if (!receipt) {
+      res.status(404).json({ error: 'Receipt not found' });
+      return;
+    }
+
+    // Verify item exists
+    const existingItem = await ItemModel.findById(itemId, id);
+    if (!existingItem) {
+      res.status(404).json({ error: 'Item not found' });
+      return;
+    }
+
+    // Build update object
+    const updateData: any = {};
+    if (name !== undefined) updateData.name = name;
+    if (unitPrice !== undefined) updateData.unit_price = parseFloat(unitPrice);
+    if (quantity !== undefined) updateData.quantity = parseInt(quantity);
+    if (category !== undefined) updateData.category = category || null;
+
+    // Calculate total_price if unitPrice or quantity changed
+    const newUnitPrice = updateData.unit_price ?? existingItem.unit_price;
+    const newQuantity = updateData.quantity ?? existingItem.quantity;
+    updateData.total_price = newUnitPrice * newQuantity;
+
+    // Update item
+    const updatedItem = await ItemModel.update(itemId, id, updateData);
+
+    // Recalculate receipt total
+    const allItems = await ItemModel.findByReceiptId(id);
+    const newTotal = allItems.reduce((sum, item) => sum + parseFloat(String(item.total_price)), 0);
+    await ReceiptModel.update(id, userId, { total_amount: newTotal });
+
+    res.json({
+      success: true,
+      item: updatedItem,
+      newReceiptTotal: newTotal,
+    });
+  } catch (error) {
+    console.error('Update item error:', error);
+    res.status(500).json({ error: 'Failed to update item' });
+  }
+});
+
+// DELETE /api/receipts/:id/items/:itemId - Delete an item
+router.delete('/:id/items/:itemId', authenticate, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
+    const { id, itemId } = req.params;
+
+    // Verify receipt belongs to user
+    const receipt = await ReceiptModel.findById(id, userId);
+    if (!receipt) {
+      res.status(404).json({ error: 'Receipt not found' });
+      return;
+    }
+
+    // Verify item exists
+    const existingItem = await ItemModel.findById(itemId, id);
+    if (!existingItem) {
+      res.status(404).json({ error: 'Item not found' });
+      return;
+    }
+
+    // Delete item
+    await ItemModel.delete(itemId, id);
+
+    // Recalculate receipt total
+    const allItems = await ItemModel.findByReceiptId(id);
+    const newTotal = allItems.reduce((sum, item) => sum + parseFloat(String(item.total_price)), 0);
+    await ReceiptModel.update(id, userId, { total_amount: newTotal });
+
+    res.json({
+      success: true,
+      message: 'Item deleted',
+      newReceiptTotal: newTotal,
+    });
+  } catch (error) {
+    console.error('Delete item error:', error);
+    res.status(500).json({ error: 'Failed to delete item' });
+  }
+});
+
 // DELETE /api/receipts/:id - Delete receipt and all items
 router.delete('/:id', authenticate, async (req: Request, res: Response): Promise<void> => {
   try {

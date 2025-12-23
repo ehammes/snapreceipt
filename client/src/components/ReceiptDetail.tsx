@@ -80,6 +80,18 @@ const ReceiptDetail: React.FC = () => {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  // Item edit/delete state
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [editItemForm, setEditItemForm] = useState<ItemForm>({
+    name: '',
+    unitPrice: '',
+    quantity: '1',
+    category: '',
+  });
+  const [deleteItemModalOpen, setDeleteItemModalOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<ReceiptItem | null>(null);
+  const [deletingItem, setDeletingItem] = useState(false);
+
   useEffect(() => {
     if (id) {
       fetchReceipt();
@@ -257,6 +269,108 @@ const ReceiptDetail: React.FC = () => {
 
   const handleDeleteCancel = () => {
     setDeleteModalOpen(false);
+  };
+
+  // Item edit handlers
+  const handleEditItemClick = (item: ReceiptItem) => {
+    setEditingItemId(item.id);
+    setEditItemForm({
+      name: item.name,
+      unitPrice: String(item.unit_price),
+      quantity: String(item.quantity),
+      category: item.category || 'Groceries',
+    });
+  };
+
+  const handleEditItemCancel = () => {
+    setEditingItemId(null);
+    setEditItemForm({
+      name: '',
+      unitPrice: '',
+      quantity: '1',
+      category: '',
+    });
+  };
+
+  const handleEditItemSave = async () => {
+    if (!receipt || !editingItemId || !editItemForm.name || !editItemForm.unitPrice) return;
+
+    setSaving(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(
+        `http://localhost:3001/api/receipts/${id}/items/${editingItemId}`,
+        {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            name: editItemForm.name,
+            unitPrice: parseFloat(editItemForm.unitPrice),
+            quantity: parseInt(editItemForm.quantity) || 1,
+            category: editItemForm.category,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to update item');
+      }
+
+      // Refetch receipt to get updated items and total
+      await fetchReceipt();
+      handleEditItemCancel();
+    } catch (err) {
+      console.error('Error updating item:', err);
+      alert('Failed to update item');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Item delete handlers
+  const handleDeleteItemClick = (item: ReceiptItem) => {
+    setItemToDelete(item);
+    setDeleteItemModalOpen(true);
+  };
+
+  const handleDeleteItemConfirm = async () => {
+    if (!receipt || !itemToDelete) return;
+
+    setDeletingItem(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(
+        `http://localhost:3001/api/receipts/${id}/items/${itemToDelete.id}`,
+        {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to delete item');
+      }
+
+      // Refetch receipt to get updated items and total
+      await fetchReceipt();
+      setDeleteItemModalOpen(false);
+      setItemToDelete(null);
+    } catch (err) {
+      console.error('Error deleting item:', err);
+      alert('Failed to delete item');
+    } finally {
+      setDeletingItem(false);
+    }
+  };
+
+  const handleDeleteItemCancel = () => {
+    setDeleteItemModalOpen(false);
+    setItemToDelete(null);
   };
 
   // Loading state
@@ -499,22 +613,110 @@ const ReceiptDetail: React.FC = () => {
                   {receipt.items.map((item) => (
                     <div
                       key={item.id}
-                      className="flex justify-between items-start bg-gray-50 rounded-lg p-3"
+                      className="bg-gray-50 rounded-lg p-3"
                     >
-                      <div className="flex-1">
-                        <p className="font-medium text-gray-800">{item.name}</p>
-                        <p className="text-sm text-gray-500">
-                          {formatCurrency(item.unit_price)} × {item.quantity} = {formatCurrency(item.total_price)}
-                        </p>
-                        {item.category && (
-                          <span className="text-xs text-blue-600 mt-1 inline-block">
-                            {item.category}
-                          </span>
-                        )}
-                      </div>
-                      <span className="font-semibold text-green-600">
-                        {formatCurrency(item.total_price)}
-                      </span>
+                      {editingItemId === item.id ? (
+                        // Edit Mode
+                        <div className="space-y-3">
+                          <div>
+                            <label className="block text-xs text-gray-500 mb-1">Item Name</label>
+                            <input
+                              type="text"
+                              value={editItemForm.name}
+                              onChange={(e) => setEditItemForm({ ...editItemForm, name: e.target.value })}
+                              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            />
+                          </div>
+                          <div className="grid grid-cols-3 gap-2">
+                            <div>
+                              <label className="block text-xs text-gray-500 mb-1">Unit Price</label>
+                              <input
+                                type="number"
+                                step="0.01"
+                                value={editItemForm.unitPrice}
+                                onChange={(e) => setEditItemForm({ ...editItemForm, unitPrice: e.target.value })}
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-gray-500 mb-1">Quantity</label>
+                              <input
+                                type="number"
+                                min="1"
+                                value={editItemForm.quantity}
+                                onChange={(e) => setEditItemForm({ ...editItemForm, quantity: e.target.value })}
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-gray-500 mb-1">Category</label>
+                              <select
+                                value={editItemForm.category}
+                                onChange={(e) => setEditItemForm({ ...editItemForm, category: e.target.value })}
+                                className="w-full border border-gray-300 rounded-lg px-2 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              >
+                                {CATEGORIES.map((cat) => (
+                                  <option key={cat} value={cat}>{cat}</option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={handleEditItemSave}
+                              disabled={saving || !editItemForm.name || !editItemForm.unitPrice}
+                              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                            >
+                              {saving ? 'Saving...' : 'Save'}
+                            </button>
+                            <button
+                              onClick={handleEditItemCancel}
+                              disabled={saving}
+                              className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        // View Mode
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <p className="font-medium text-gray-800">{item.name}</p>
+                            <p className="text-sm text-gray-500">
+                              {formatCurrency(item.unit_price)} × {item.quantity} = {formatCurrency(item.total_price)}
+                            </p>
+                            {item.category && (
+                              <span className="text-xs text-blue-600 mt-1 inline-block">
+                                {item.category}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-green-600">
+                              {formatCurrency(item.total_price)}
+                            </span>
+                            <button
+                              onClick={() => handleEditItemClick(item)}
+                              className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                              title="Edit item"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                              </svg>
+                            </button>
+                            <button
+                              onClick={() => handleDeleteItemClick(item)}
+                              className="p-1 text-gray-400 hover:text-red-600 transition-colors"
+                              title="Delete item"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -718,6 +920,90 @@ const ReceiptDetail: React.FC = () => {
                 className="flex-1 px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {deleting ? (
+                  <>
+                    <svg
+                      className="w-5 h-5 animate-spin"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      />
+                    </svg>
+                    Deleting...
+                  </>
+                ) : (
+                  'Delete'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Item Confirmation Modal */}
+      {deleteItemModalOpen && itemToDelete && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+            {/* Warning Icon */}
+            <svg
+              className="w-12 h-12 text-red-600 mx-auto mb-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+              />
+            </svg>
+
+            {/* Modal Content */}
+            <h2 className="text-xl font-bold text-gray-800 text-center mb-2">
+              Delete Item?
+            </h2>
+            <p className="text-gray-600 text-center mb-4">
+              Are you sure you want to delete this item? This action cannot be undone.
+            </p>
+
+            {/* Item Preview */}
+            <div className="bg-gray-50 rounded-lg p-3 mb-6">
+              <p className="font-medium text-gray-800">{itemToDelete.name}</p>
+              <p className="text-sm text-gray-600">
+                {formatCurrency(itemToDelete.unit_price)} × {itemToDelete.quantity}
+              </p>
+              <p className="text-green-600 font-bold">
+                {formatCurrency(itemToDelete.total_price)}
+              </p>
+            </div>
+
+            {/* Buttons */}
+            <div className="flex gap-3">
+              <button
+                onClick={handleDeleteItemCancel}
+                disabled={deletingItem}
+                className="flex-1 px-4 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-medium transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteItemConfirm}
+                disabled={deletingItem}
+                className="flex-1 px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {deletingItem ? (
                   <>
                     <svg
                       className="w-5 h-5 animate-spin"

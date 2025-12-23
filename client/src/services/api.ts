@@ -163,6 +163,38 @@ export const receiptsApi = {
     return handleResponse(response);
   },
 
+  updateItem: async (
+    receiptId: string,
+    itemId: string,
+    data: {
+      name?: string;
+      unitPrice?: number;
+      quantity?: number;
+      category?: string;
+    }
+  ) => {
+    const response = await fetch(
+      `${API_BASE_URL}/receipts/${receiptId}/items/${itemId}`,
+      {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(data),
+      }
+    );
+    return handleResponse(response);
+  },
+
+  deleteItem: async (receiptId: string, itemId: string) => {
+    const response = await fetch(
+      `${API_BASE_URL}/receipts/${receiptId}/items/${itemId}`,
+      {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+      }
+    );
+    return handleResponse(response);
+  },
+
   saveGuestReceipt: async (guestReceiptData: {
     imageUrl: string;
     storeName: string;
