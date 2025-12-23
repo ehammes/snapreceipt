@@ -50,6 +50,10 @@ const ReceiptGallery: React.FC = () => {
     category: '',
   });
 
+  // Sort state
+  const [sortBy, setSortBy] = useState<'purchase_date' | 'upload_date' | 'total'>('purchase_date');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+
   // Delete state
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [receiptToDelete, setReceiptToDelete] = useState<Receipt | null>(null);
@@ -182,6 +186,36 @@ const ReceiptGallery: React.FC = () => {
       return true;
     });
   }, [receipts, filters]);
+
+  // Sort filtered receipts
+  const sortedReceipts = useMemo(() => {
+    return [...filteredReceipts].sort((a, b) => {
+      let aValue: number, bValue: number;
+
+      switch (sortBy) {
+        case 'purchase_date':
+          aValue = new Date(a.purchase_date).getTime();
+          bValue = new Date(b.purchase_date).getTime();
+          break;
+        case 'upload_date':
+          aValue = new Date(a.upload_date).getTime();
+          bValue = new Date(b.upload_date).getTime();
+          break;
+        case 'total':
+          aValue = a.total_amount;
+          bValue = b.total_amount;
+          break;
+        default:
+          return 0;
+      }
+
+      if (sortOrder === 'asc') {
+        return aValue > bValue ? 1 : -1;
+      } else {
+        return aValue < bValue ? 1 : -1;
+      }
+    });
+  }, [filteredReceipts, sortBy, sortOrder]);
 
   const handleFilterChange = (key: keyof Filters, value: string) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
@@ -332,25 +366,56 @@ const ReceiptGallery: React.FC = () => {
         {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
           <h1 className="text-2xl font-bold text-gray-800">My Receipts</h1>
-          <button
-            onClick={() => navigate('/upload')}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors"
-          >
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
+            {/* Sort Controls */}
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-gray-600 whitespace-nowrap">Sort by:</label>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as 'purchase_date' | 'upload_date' | 'total')}
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+              >
+                <option value="purchase_date">Purchase Date</option>
+                <option value="upload_date">Upload Date</option>
+                <option value="total">Total Amount</option>
+              </select>
+              <button
+                onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                title={sortOrder === 'asc' ? 'Ascending' : 'Descending'}
+              >
+                {sortOrder === 'asc' ? (
+                  <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
+                  </svg>
+                ) : (
+                  <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h9m5-4v12m0 0l-4-4m4 4l4-4" />
+                  </svg>
+                )}
+              </button>
+            </div>
+            {/* Upload Button */}
+            <button
+              onClick={() => navigate('/upload')}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium flex items-center justify-center gap-2 transition-colors"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 4v16m8-8H4"
-              />
-            </svg>
-            Upload New Receipt
-          </button>
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 4v16m8-8H4"
+                />
+              </svg>
+              Upload New Receipt
+            </button>
+          </div>
         </div>
 
         {/* Search and Filter Bar */}
@@ -549,9 +614,9 @@ const ReceiptGallery: React.FC = () => {
         )}
 
         {/* Receipts Grid */}
-        {filteredReceipts.length > 0 && (
+        {sortedReceipts.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {filteredReceipts.map((receipt) => (
+            {sortedReceipts.map((receipt) => (
               <div
                 key={receipt.id}
                 onClick={() => navigate(`/receipts/${receipt.id}`)}

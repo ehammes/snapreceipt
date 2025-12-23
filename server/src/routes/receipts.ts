@@ -212,7 +212,7 @@ router.get('/', authenticate, async (req: Request, res: Response): Promise<void>
       paramIndex++;
     }
 
-    query += ` GROUP BY r.id ORDER BY r.upload_date DESC`;
+    query += ` GROUP BY r.id ORDER BY r.purchase_date DESC, r.upload_date DESC`;
 
     const result = await pool.query(query, params);
 
