@@ -76,6 +76,10 @@ const ReceiptDetail: React.FC = () => {
     category: 'Groceries',
   });
 
+  // Delete state
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
   useEffect(() => {
     if (id) {
       fetchReceipt();
@@ -216,6 +220,45 @@ const ReceiptDetail: React.FC = () => {
     return `$${Number(amount).toFixed(2)}`;
   };
 
+  // Delete handlers
+  const handleDeleteClick = () => {
+    setDeleteModalOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!receipt) return;
+
+    setDeleting(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(
+        `http://localhost:3001/api/receipts/${receipt.id}`,
+        {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to delete receipt');
+      }
+
+      // Navigate back to receipts
+      navigate('/receipts');
+    } catch (err) {
+      console.error('Delete error:', err);
+      alert('Failed to delete receipt. Please try again.');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteModalOpen(false);
+  };
+
   // Loading state
   if (loading) {
     return (
@@ -250,26 +293,48 @@ const ReceiptDetail: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-100 p-4 sm:p-6">
       <div className="max-w-6xl mx-auto">
-        {/* Back Button */}
-        <button
-          onClick={() => navigate('/receipts')}
-          className="flex items-center gap-2 text-gray-600 hover:text-gray-800 mb-4 transition-colors"
-        >
-          <svg
-            className="w-5 h-5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
+        {/* Header with Back and Delete buttons */}
+        <div className="flex justify-between items-center mb-4">
+          <button
+            onClick={() => navigate('/receipts')}
+            className="flex items-center gap-2 text-gray-600 hover:text-gray-800 transition-colors"
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M15 19l-7-7 7-7"
-            />
-          </svg>
-          Back to Receipts
-        </button>
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 19l-7-7 7-7"
+              />
+            </svg>
+            Back to Receipts
+          </button>
+
+          <button
+            onClick={handleDeleteClick}
+            className="flex items-center gap-2 px-4 py-2 bg-red-100 text-red-700 hover:bg-red-200 rounded-lg font-medium transition-colors"
+          >
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+              />
+            </svg>
+            Delete Receipt
+          </button>
+        </div>
 
         {/* Two-column layout */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -588,6 +653,99 @@ const ReceiptDetail: React.FC = () => {
               />
             </svg>
           </button>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteModalOpen && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+            {/* Warning Icon */}
+            <svg
+              className="w-12 h-12 text-red-600 mx-auto mb-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+              />
+            </svg>
+
+            {/* Modal Content */}
+            <h2 className="text-xl font-bold text-gray-800 text-center mb-2">
+              Delete Receipt?
+            </h2>
+            <p className="text-gray-600 text-center mb-4">
+              Are you sure you want to delete this receipt? This action cannot
+              be undone. All items will also be deleted.
+            </p>
+
+            {/* Receipt Preview */}
+            <div className="bg-gray-50 rounded-lg p-3 mb-6">
+              <p className="font-medium text-gray-800">
+                {receipt.store_name || 'Costco'}
+              </p>
+              <p className="text-sm text-gray-600">
+                {formatDate(receipt.purchase_date)}
+              </p>
+              <p className="text-green-600 font-bold">
+                {formatCurrency(receipt.total_amount)}
+              </p>
+              {receipt.items && receipt.items.length > 0 && (
+                <p className="text-xs text-gray-500 mt-1">
+                  {receipt.items.length} item
+                  {receipt.items.length !== 1 ? 's' : ''}
+                </p>
+              )}
+            </div>
+
+            {/* Buttons */}
+            <div className="flex gap-3">
+              <button
+                onClick={handleDeleteCancel}
+                disabled={deleting}
+                className="flex-1 px-4 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-medium transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteConfirm}
+                disabled={deleting}
+                className="flex-1 px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {deleting ? (
+                  <>
+                    <svg
+                      className="w-5 h-5 animate-spin"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      />
+                    </svg>
+                    Deleting...
+                  </>
+                ) : (
+                  'Delete'
+                )}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

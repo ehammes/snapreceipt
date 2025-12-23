@@ -72,7 +72,10 @@ router.post('/upload', upload.single('receipt'), optionalAuth, async (req: Reque
 
       // Check if user is authenticated
       if (!req.userId) {
-        // Guest mode - return data without saving
+        // Guest mode - return data without saving, clean up file
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
         res.json({
           success: true,
           guestMode: true,
@@ -85,7 +88,7 @@ router.post('/upload', upload.single('receipt'), optionalAuth, async (req: Reque
         return;
       }
 
-      // Authenticated mode - save to database
+      // Authenticated mode - keep the file and save to database
       const receipt = await ReceiptModel.create({
         user_id: req.userId,
         image_url: imageUrl,
@@ -125,11 +128,12 @@ router.post('/upload', upload.single('receipt'), optionalAuth, async (req: Reque
           items: savedItems,
         },
       });
-    } finally {
-      // Clean up temp file
+    } catch (innerError) {
+      // Clean up file on error
       if (fs.existsSync(filePath)) {
         fs.unlinkSync(filePath);
       }
+      throw innerError;
     }
   } catch (error) {
     console.error('Upload error:', error);
@@ -343,6 +347,74 @@ router.patch('/:id', authenticate, async (req: Request, res: Response): Promise<
   } catch (error) {
     console.error('Update receipt error:', error);
     res.status(500).json({ error: 'Failed to update receipt' });
+  }
+});
+
+// POST /api/receipts/save-guest - Save guest receipt to user account
+router.post('/save-guest', authenticate, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
+    const { guestReceiptData } = req.body;
+
+    if (!guestReceiptData) {
+      res.status(400).json({ error: 'No guest receipt data provided' });
+      return;
+    }
+
+    const {
+      imageUrl,
+      storeName,
+      storeLocation,
+      storeCity,
+      storeState,
+      storeZip,
+      purchaseDate,
+      totalAmount,
+      items,
+    } = guestReceiptData;
+
+    // Create the receipt
+    const receipt = await ReceiptModel.create({
+      user_id: userId,
+      image_url: imageUrl || '',
+      purchase_date: purchaseDate ? new Date(purchaseDate) : new Date(),
+      total_amount: totalAmount || 0,
+      store_name: storeName || 'Costco',
+      store_location: storeLocation || '',
+      store_city: storeCity || '',
+      store_state: storeState || '',
+      store_zip: storeZip || '',
+    });
+
+    // Save items if present
+    let savedItems: any[] = [];
+    if (items && items.length > 0) {
+      const itemsToCreate = items.map((item: any) => ({
+        receipt_id: receipt.id,
+        name: item.name,
+        unit_price: item.unitPrice || 0,
+        quantity: item.quantity || 1,
+        total_price: item.totalPrice || 0,
+        category: item.category || null,
+      }));
+      savedItems = await ItemModel.createBatch(itemsToCreate);
+
+      // Recalculate total from items
+      const calculatedTotal = savedItems.reduce(
+        (sum, item) => sum + parseFloat(item.total_price),
+        0
+      );
+      await ReceiptModel.update(receipt.id, userId, { total_amount: calculatedTotal });
+    }
+
+    res.status(201).json({
+      success: true,
+      receiptId: receipt.id,
+      message: 'Guest receipt saved to your account',
+    });
+  } catch (error) {
+    console.error('Save guest receipt error:', error);
+    res.status(500).json({ error: 'Failed to save guest receipt' });
   }
 });
 

@@ -5,6 +5,8 @@ import ReceiptUpload from './components/ReceiptUpload';
 import ReceiptGallery from './components/ReceiptGallery';
 import ReceiptDetail from './components/ReceiptDetail';
 import AnalyticsDashboard from './components/AnalyticsDashboard';
+import Login from './components/Login';
+import Register from './components/Register';
 
 // Home page with quick actions
 const Home = () => (
@@ -106,6 +108,8 @@ function App() {
         <Navigation />
         <Routes>
           <Route path="/" element={<Home />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
           <Route path="/upload" element={<ReceiptUpload />} />
           <Route path="/dashboard" element={<AnalyticsDashboard />} />
           <Route path="/receipts" element={<ReceiptGallery />} />

@@ -82,9 +82,23 @@ const ReceiptUpload: React.FC = () => {
       }
 
       if (data.guestMode) {
-        // Guest mode - show processed data
+        // Guest mode - show processed data and save to sessionStorage
         setIsGuest(true);
         setProcessedData(data.data);
+
+        // Save guest receipt data to sessionStorage for account creation
+        const guestReceiptData = {
+          imageUrl: data.data.imageUrl,
+          storeName: data.data.storeName,
+          storeLocation: data.data.storeLocation,
+          storeCity: data.data.storeCity,
+          storeState: data.data.storeState,
+          storeZip: data.data.storeZip,
+          purchaseDate: data.data.purchaseDate,
+          totalAmount: data.data.totalAmount,
+          items: data.data.items,
+        };
+        sessionStorage.setItem('guestReceipt', JSON.stringify(guestReceiptData));
       } else {
         // Authenticated - redirect to receipt detail
         navigate(`/receipts/${data.receiptId}`);
@@ -106,6 +120,9 @@ const ReceiptUpload: React.FC = () => {
     setIsGuest(false);
     setUploading(false);
     setProcessing(false);
+
+    // Clear guest receipt from sessionStorage
+    sessionStorage.removeItem('guestReceipt');
 
     // Clear file input values
     if (fileInputRef.current) {
