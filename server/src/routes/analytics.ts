@@ -102,6 +102,54 @@ router.get('/category-breakdown', authenticate, async (req: Request, res: Respon
   }
 });
 
+// GET /api/analytics/summary-metrics - Summary metrics for dashboard cards
+router.get('/summary-metrics', authenticate, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
+
+    // Get receipt metrics (excluding $0 receipts)
+    const receiptQuery = `
+      SELECT
+        COALESCE(SUM(total_amount), 0) as total_spent,
+        COUNT(*) as total_receipts
+      FROM receipts
+      WHERE user_id = $1 AND total_amount > 0
+    `;
+    const receiptResult = await pool.query(receiptQuery, [userId]);
+    const receiptRow = receiptResult.rows[0];
+
+    const totalSpent = parseFloat(receiptRow.total_spent) || 0;
+    const totalReceipts = parseInt(receiptRow.total_receipts) || 0;
+    const averagePerReceipt = totalReceipts > 0 ? totalSpent / totalReceipts : 0;
+
+    // Get item metrics (excluding items from $0 receipts)
+    const itemQuery = `
+      SELECT
+        COALESCE(SUM(i.quantity), 0) as total_items,
+        COUNT(DISTINCT LOWER(i.name)) as unique_items
+      FROM items i
+      JOIN receipts r ON i.receipt_id = r.id
+      WHERE r.user_id = $1 AND r.total_amount > 0
+    `;
+    const itemResult = await pool.query(itemQuery, [userId]);
+    const itemRow = itemResult.rows[0];
+
+    const totalItems = parseInt(itemRow.total_items) || 0;
+    const uniqueItems = parseInt(itemRow.unique_items) || 0;
+
+    res.json({
+      totalSpent,
+      totalItems,
+      uniqueItems,
+      totalReceipts,
+      averagePerReceipt: Math.round(averagePerReceipt * 100) / 100,
+    });
+  } catch (error) {
+    console.error('Summary metrics error:', error);
+    res.status(500).json({ error: 'Failed to fetch summary metrics' });
+  }
+});
+
 // GET /api/analytics/summary - Overall summary stats
 router.get('/summary', authenticate, async (req: Request, res: Response): Promise<void> => {
   try {

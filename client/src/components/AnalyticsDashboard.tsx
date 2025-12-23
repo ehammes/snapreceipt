@@ -37,11 +37,26 @@ const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D'
 type SortKey = 'name' | 'quantity' | 'totalSpent';
 type SortOrder = 'asc' | 'desc';
 
+interface SummaryMetrics {
+  totalSpent: number;
+  totalItems: number;
+  uniqueItems: number;
+  totalReceipts: number;
+  averagePerReceipt: number;
+}
+
 const AnalyticsDashboard: React.FC = () => {
   const navigate = useNavigate();
   const [timeline, setTimeline] = useState<SpendingTimeline[]>([]);
   const [topItems, setTopItems] = useState<TopItem[]>([]);
   const [categories, setCategories] = useState<CategoryBreakdown[]>([]);
+  const [summaryMetrics, setSummaryMetrics] = useState<SummaryMetrics>({
+    totalSpent: 0,
+    totalItems: 0,
+    uniqueItems: 0,
+    totalReceipts: 0,
+    averagePerReceipt: 0,
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -92,14 +107,15 @@ const AnalyticsDashboard: React.FC = () => {
 
       const headers = { Authorization: `Bearer ${token}` };
 
-      const [timelineRes, topItemsRes, categoriesRes] = await Promise.all([
+      const [timelineRes, topItemsRes, categoriesRes, metricsRes] = await Promise.all([
         fetch('http://localhost:3001/api/analytics/spending-timeline', { headers }),
         fetch('http://localhost:3001/api/analytics/top-items?limit=10', { headers }),
         fetch('http://localhost:3001/api/analytics/category-breakdown', { headers }),
+        fetch('http://localhost:3001/api/analytics/summary-metrics', { headers }),
       ]);
 
-      if (!timelineRes.ok || !topItemsRes.ok || !categoriesRes.ok) {
-        if (timelineRes.status === 401) {
+      if (!timelineRes.ok || !topItemsRes.ok || !categoriesRes.ok || !metricsRes.ok) {
+        if (timelineRes.status === 401 || metricsRes.status === 401) {
           localStorage.removeItem('token');
           navigate('/login');
           return;
@@ -107,15 +123,17 @@ const AnalyticsDashboard: React.FC = () => {
         throw new Error('Failed to fetch analytics data');
       }
 
-      const [timelineData, topItemsData, categoriesData] = await Promise.all([
+      const [timelineData, topItemsData, categoriesData, metricsData] = await Promise.all([
         timelineRes.json(),
         topItemsRes.json(),
         categoriesRes.json(),
+        metricsRes.json(),
       ]);
 
       setTimeline(timelineData.timeline || []);
       setTopItems(topItemsData.topItems || []);
       setCategories(categoriesData.categories || []);
+      setSummaryMetrics(metricsData);
     } catch (err) {
       console.error('Error fetching analytics:', err);
       setError('Failed to load analytics. Please try again.');
@@ -125,9 +143,6 @@ const AnalyticsDashboard: React.FC = () => {
   };
 
   const formatCurrency = (value: number) => `$${value.toFixed(2)}`;
-
-  const totalSpent = timeline.reduce((sum, item) => sum + item.amount, 0);
-  const totalCategories = categories.length;
 
   // Loading state
   if (loading) {
@@ -190,29 +205,64 @@ const AnalyticsDashboard: React.FC = () => {
         </div>
 
         {/* Summary Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 mb-6">
           {/* Total Spent Card */}
-          <div className="bg-blue-50 rounded-lg p-6">
-            <p className="text-blue-900 text-sm font-medium">Total Spent</p>
-            <p className="text-3xl font-bold text-blue-600 mt-1">
-              {formatCurrency(totalSpent)}
+          <div className="bg-blue-50 p-6 rounded-lg">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-semibold text-blue-900">Total Spent</h3>
+              <span className="text-2xl">💰</span>
+            </div>
+            <p className="text-3xl font-bold text-blue-600">
+              ${summaryMetrics.totalSpent.toFixed(2)}
             </p>
+          </div>
+
+          {/* Total Items Card */}
+          <div className="bg-green-50 p-6 rounded-lg">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-semibold text-green-900">Total Items</h3>
+              <span className="text-2xl">📦</span>
+            </div>
+            <p className="text-3xl font-bold text-green-600">
+              {summaryMetrics.totalItems}
+            </p>
+            <p className="text-xs text-green-700 mt-1">items purchased</p>
           </div>
 
           {/* Unique Items Card */}
-          <div className="bg-green-50 rounded-lg p-6">
-            <p className="text-green-900 text-sm font-medium">Unique Items</p>
-            <p className="text-3xl font-bold text-green-600 mt-1">
-              {topItems.length}
+          <div className="bg-purple-50 p-6 rounded-lg">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-semibold text-purple-900">Unique Items</h3>
+              <span className="text-2xl">✨</span>
+            </div>
+            <p className="text-3xl font-bold text-purple-600">
+              {summaryMetrics.uniqueItems}
             </p>
+            <p className="text-xs text-purple-700 mt-1">different products</p>
           </div>
 
-          {/* Categories Card */}
-          <div className="bg-purple-50 rounded-lg p-6">
-            <p className="text-purple-900 text-sm font-medium">Categories</p>
-            <p className="text-3xl font-bold text-purple-600 mt-1">
-              {totalCategories}
+          {/* Total Receipts Card */}
+          <div className="bg-orange-50 p-6 rounded-lg">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-semibold text-orange-900">Total Receipts</h3>
+              <span className="text-2xl">🧾</span>
+            </div>
+            <p className="text-3xl font-bold text-orange-600">
+              {summaryMetrics.totalReceipts}
             </p>
+            <p className="text-xs text-orange-700 mt-1">shopping trips</p>
+          </div>
+
+          {/* Average Per Receipt Card */}
+          <div className="bg-teal-50 p-6 rounded-lg">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-semibold text-teal-900">Avg Per Receipt</h3>
+              <span className="text-2xl">📊</span>
+            </div>
+            <p className="text-3xl font-bold text-teal-600">
+              ${summaryMetrics.averagePerReceipt.toFixed(2)}
+            </p>
+            <p className="text-xs text-teal-700 mt-1">per shopping trip</p>
           </div>
         </div>
 

@@ -253,6 +253,13 @@ export const analyticsApi = {
     });
     return handleResponse(response);
   },
+
+  getSummaryMetrics: async () => {
+    const response = await fetch(`${API_BASE_URL}/analytics/summary-metrics`, {
+      headers: getAuthHeaders(),
+    });
+    return handleResponse(response);
+  },
 };
 
 export default {
