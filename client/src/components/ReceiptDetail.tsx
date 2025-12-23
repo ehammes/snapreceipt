@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { CATEGORIES } from '../constants/categories';
 
 interface ReceiptItem {
   id: string;
@@ -39,15 +40,6 @@ interface ItemForm {
   quantity: string;
   category: string;
 }
-
-const CATEGORIES = [
-  'Groceries',
-  'Electronics',
-  'Household',
-  'Clothing',
-  'Health',
-  'Other',
-];
 
 const ReceiptDetail: React.FC = () => {
   const navigate = useNavigate();

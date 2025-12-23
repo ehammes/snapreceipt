@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { CATEGORIES_WITH_ALL } from '../constants/categories';
 
 interface ReceiptItem {
   id: string;
@@ -33,16 +34,6 @@ interface Filters {
   maxAmount: string;
   category: string;
 }
-
-const CATEGORIES = [
-  'All Categories',
-  'Groceries',
-  'Electronics',
-  'Household',
-  'Clothing',
-  'Health',
-  'Other',
-];
 
 const ReceiptGallery: React.FC = () => {
   const navigate = useNavigate();
@@ -462,7 +453,7 @@ const ReceiptGallery: React.FC = () => {
                     onChange={(e) => handleFilterChange('category', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
-                    {CATEGORIES.map((cat) => (
+                    {CATEGORIES_WITH_ALL.map((cat) => (
                       <option key={cat} value={cat === 'All Categories' ? '' : cat}>
                         {cat}
                       </option>
