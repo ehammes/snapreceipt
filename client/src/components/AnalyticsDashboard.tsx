@@ -1,11 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   LineChart,
-  BarChart,
   PieChart,
   Line,
-  Bar,
   Pie,
   Cell,
   XAxis,
@@ -36,6 +34,9 @@ interface CategoryBreakdown {
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D'];
 
+type SortKey = 'name' | 'quantity' | 'totalSpent';
+type SortOrder = 'asc' | 'desc';
+
 const AnalyticsDashboard: React.FC = () => {
   const navigate = useNavigate();
   const [timeline, setTimeline] = useState<SpendingTimeline[]>([]);
@@ -43,6 +44,39 @@ const AnalyticsDashboard: React.FC = () => {
   const [categories, setCategories] = useState<CategoryBreakdown[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Table sorting state
+  const [sortBy, setSortBy] = useState<SortKey>('quantity');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
+
+  // Sorted items
+  const sortedItems = useMemo(() => {
+    return [...topItems].sort((a, b) => {
+      let aValue: string | number = a[sortBy];
+      let bValue: string | number = b[sortBy];
+
+      if (sortBy === 'name') {
+        aValue = (aValue as string).toLowerCase();
+        bValue = (bValue as string).toLowerCase();
+      }
+
+      if (sortOrder === 'asc') {
+        return aValue > bValue ? 1 : -1;
+      } else {
+        return aValue < bValue ? 1 : -1;
+      }
+    });
+  }, [topItems, sortBy, sortOrder]);
+
+  // Handle column sort
+  const handleSort = (column: SortKey) => {
+    if (sortBy === column) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(column);
+      setSortOrder('desc');
+    }
+  };
 
   useEffect(() => {
     fetchAnalytics();
@@ -225,128 +259,229 @@ const AnalyticsDashboard: React.FC = () => {
           )}
         </div>
 
-        {/* Charts Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Chart 2: Most Purchased Items */}
-          <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6">
-            <h2 className="text-lg font-semibold text-gray-800 mb-4">
-              Most Purchased Items
-            </h2>
-            {topItems.length > 0 ? (
-              <ResponsiveContainer width="100%" height={400}>
-                <BarChart
-                  data={topItems}
-                  layout="vertical"
-                  margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+        {/* Most Purchased Items Table */}
+        <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6 mb-6">
+          <h2 className="text-lg font-semibold text-gray-800 mb-4">
+            Most Purchased Items
+          </h2>
+
+          {/* Mobile Card View */}
+          <div className="md:hidden space-y-3">
+            {sortedItems.length > 0 ? (
+              sortedItems.map((item, index) => (
+                <div
+                  key={index}
+                  className="bg-gray-50 p-4 rounded-lg border border-gray-200"
                 >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis type="number" tick={{ fontSize: 11 }} />
-                  <YAxis
-                    type="category"
-                    dataKey="name"
-                    width={120}
-                    tick={{ fontSize: 11 }}
-                  />
-                  <Tooltip
-                    formatter={(value, name) => {
-                      if (name === 'Total Spent ($)') {
-                        return [formatCurrency(Number(value)), name];
-                      }
-                      return [value, name];
-                    }}
-                  />
-                  <Legend />
-                  <Bar
-                    dataKey="quantity"
-                    fill="#8884d8"
-                    name="Quantity Purchased"
-                  />
-                  <Bar
-                    dataKey="totalSpent"
-                    fill="#82ca9d"
-                    name="Total Spent ($)"
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="h-64 flex items-center justify-center text-gray-500">
-                No item data available
-              </div>
-            )}
-          </div>
-
-          {/* Chart 3: Category Breakdown */}
-          <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6">
-            <h2 className="text-lg font-semibold text-gray-800 mb-4">
-              Spending by Category
-            </h2>
-            {categories.length > 0 ? (
-              <div className="flex flex-col lg:flex-row items-center">
-                <div className="w-full lg:w-1/2">
-                  <ResponsiveContainer width="100%" height={300}>
-                    <PieChart>
-                      <Pie
-                        // data={categories}
-                        dataKey="totalSpent"
-                        nameKey="category"
-                        cx="50%"
-                        cy="50%"
-                        outerRadius={100}
-                        label={({ name, percent }) =>
-                          `${name} (${((percent || 0) * 100).toFixed(0)}%)`
-                        }
-                        labelLine={false}
-                      >
-                        {categories.map((_, index) => (
-                          <Cell
-                            key={`cell-${index}`}
-                            fill={COLORS[index % COLORS.length]}
-                          />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        formatter={(value) => [formatCurrency(Number(value)), 'Spent']}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-
-                {/* Category Legend */}
-                <div className="w-full lg:w-1/2 mt-4 lg:mt-0 lg:pl-4">
-                  <div className="space-y-3">
-                    {categories.map((cat, index) => (
-                      <div
-                        key={cat.category}
-                        className="flex items-center justify-between"
-                      >
-                        <div className="flex items-center gap-2">
-                          <div
-                            className="w-4 h-4 rounded"
-                            style={{ backgroundColor: COLORS[index % COLORS.length] }}
-                          />
-                          <span className="text-sm font-medium text-gray-700">
-                            {cat.category}
-                          </span>
-                        </div>
-                        <div className="text-right">
-                          <span className="text-sm font-semibold text-gray-900">
-                            {formatCurrency(cat.totalSpent)}
-                          </span>
-                          <span className="text-xs text-gray-500 ml-2">
-                            ({cat.itemCount} items)
-                          </span>
-                        </div>
-                      </div>
-                    ))}
+                  <div className="flex justify-between items-start mb-2">
+                    <h3 className="font-medium text-gray-900">{item.name}</h3>
+                    <span className="text-sm font-semibold text-green-600">
+                      ${item.totalSpent.toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-sm text-gray-500">
+                    <div>
+                      <span className="block text-xs text-gray-400">Quantity</span>
+                      <span className="font-semibold text-gray-900">
+                        {item.quantity}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="block text-xs text-gray-400">Purchases</span>
+                      <span>{item.purchaseCount}</span>
+                    </div>
+                    <div>
+                      <span className="block text-xs text-gray-400">Avg Price</span>
+                      <span>${(item.totalSpent / item.quantity).toFixed(2)}</span>
+                    </div>
                   </div>
                 </div>
-              </div>
+              ))
             ) : (
-              <div className="h-64 flex items-center justify-center text-gray-500">
-                No category data available
+              <div className="text-center py-8 text-gray-500">
+                <p className="text-lg mb-2">No items yet</p>
+                <p className="text-sm">
+                  Upload receipts to see your most purchased items
+                </p>
               </div>
             )}
           </div>
+
+          {/* Desktop Table View */}
+          <div className="hidden md:block overflow-x-auto">
+            <table className="w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th
+                    onClick={() => handleSort('name')}
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      Product Name
+                      {sortBy === 'name' && (
+                        <span className="text-blue-600">
+                          {sortOrder === 'asc' ? '↑' : '↓'}
+                        </span>
+                      )}
+                    </div>
+                  </th>
+                  <th
+                    onClick={() => handleSort('quantity')}
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      Quantity
+                      {sortBy === 'quantity' && (
+                        <span className="text-blue-600">
+                          {sortOrder === 'asc' ? '↑' : '↓'}
+                        </span>
+                      )}
+                    </div>
+                  </th>
+                  <th
+                    onClick={() => handleSort('totalSpent')}
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      Total Spent
+                      {sortBy === 'totalSpent' && (
+                        <span className="text-blue-600">
+                          {sortOrder === 'asc' ? '↑' : '↓'}
+                        </span>
+                      )}
+                    </div>
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Purchase Count
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Avg Price
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {sortedItems.length > 0 ? (
+                  sortedItems.map((item, index) => (
+                    <tr
+                      key={index}
+                      className="hover:bg-gray-50 transition-colors"
+                    >
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">
+                          {item.name}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-semibold text-gray-900">
+                          {item.quantity}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-semibold text-green-600">
+                          ${item.totalSpent.toFixed(2)}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-500">
+                          {item.purchaseCount}{' '}
+                          {item.purchaseCount === 1 ? 'time' : 'times'}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-500">
+                          ${(item.totalSpent / item.quantity).toFixed(2)}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-12 text-center">
+                      <div className="text-gray-500">
+                        <p className="text-lg mb-2">No items yet</p>
+                        <p className="text-sm">
+                          Upload receipts to see your most purchased items
+                        </p>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Category Breakdown */}
+        <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6 mb-6">
+          <h2 className="text-lg font-semibold text-gray-800 mb-4">
+            Spending by Category
+          </h2>
+          {categories.length > 0 ? (
+            <div className="flex flex-col lg:flex-row items-center">
+              <div className="w-full lg:w-1/2">
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={categories as any}
+                      dataKey="totalSpent"
+                      nameKey="category"
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={100}
+                      label={({ name, percent }) =>
+                        `${name} (${((percent || 0) * 100).toFixed(0)}%)`
+                      }
+                      labelLine={false}
+                    >
+                      {categories.map((_, index) => (
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={COLORS[index % COLORS.length]}
+                        />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      formatter={(value) => [formatCurrency(Number(value)), 'Spent']}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Category Legend */}
+              <div className="w-full lg:w-1/2 mt-4 lg:mt-0 lg:pl-4">
+                <div className="space-y-3">
+                  {categories.map((cat, index) => (
+                    <div
+                      key={cat.category}
+                      className="flex items-center justify-between"
+                    >
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-4 h-4 rounded"
+                          style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                        />
+                        <span className="text-sm font-medium text-gray-700">
+                          {cat.category}
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-sm font-semibold text-gray-900">
+                          {formatCurrency(cat.totalSpent)}
+                        </span>
+                        <span className="text-xs text-gray-500 ml-2">
+                          ({cat.itemCount} items)
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="h-64 flex items-center justify-center text-gray-500">
+              No category data available
+            </div>
+          )}
         </div>
 
         {/* Empty State */}

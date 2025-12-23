@@ -114,9 +114,12 @@ router.post('/upload', upload.single('receipt'), optionalAuth, async (req: Reque
         }));
         savedItems = await ItemModel.createBatch(itemsToCreate);
 
-        // Recalculate total from items
-        const calculatedTotal = savedItems.reduce((sum, item) => sum + parseFloat(item.total_price), 0);
-        await ReceiptModel.update(receipt.id, req.userId, { total_amount: calculatedTotal });
+        // Only recalculate total from items if OCR didn't find a total (includes tax)
+        // Keep the OCR total if it was found - it's more accurate and includes tax
+        if (!ocrData.totalAmount || ocrData.totalAmount === 0) {
+          const calculatedTotal = savedItems.reduce((sum, item) => sum + parseFloat(item.total_price), 0);
+          await ReceiptModel.update(receipt.id, req.userId, { total_amount: calculatedTotal });
+        }
       }
 
       res.status(201).json({
