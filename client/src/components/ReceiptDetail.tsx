@@ -84,6 +84,10 @@ const ReceiptDetail: React.FC = () => {
   const [itemToDelete, setItemToDelete] = useState<ReceiptItem | null>(null);
   const [deletingItem, setDeletingItem] = useState(false);
 
+  // Total amount edit state
+  const [editingTotal, setEditingTotal] = useState(false);
+  const [totalForm, setTotalForm] = useState('');
+
   useEffect(() => {
     if (id) {
       fetchReceipt();
@@ -365,6 +369,47 @@ const ReceiptDetail: React.FC = () => {
     setItemToDelete(null);
   };
 
+  // Total amount edit handlers
+  const handleEditTotalClick = () => {
+    setTotalForm(String(receipt?.total_amount || 0));
+    setEditingTotal(true);
+  };
+
+  const handleSaveTotal = async () => {
+    if (!receipt) return;
+
+    setSaving(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`http://localhost:3001/api/receipts/${id}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ totalAmount: parseFloat(totalForm) }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update total');
+      }
+
+      const data = await response.json();
+      setReceipt(data.receipt);
+      setEditingTotal(false);
+    } catch (err) {
+      console.error('Error updating total:', err);
+      alert('Failed to update total amount');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCancelEditTotal = () => {
+    setEditingTotal(false);
+    setTotalForm('');
+  };
+
   // Loading state
   if (loading) {
     return (
@@ -584,9 +629,55 @@ const ReceiptDetail: React.FC = () => {
                       {formatDate(receipt.upload_date)}
                     </p>
                   </div>
-                  <p className="text-2xl font-bold text-green-600 pt-2">
-                    {formatCurrency(receipt.total_amount)}
-                  </p>
+                  {/* Total Amount with Edit */}
+                  <div className="pt-3 border-t border-gray-200">
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-500 text-sm">Total</span>
+                      {!editingTotal && (
+                        <button
+                          onClick={handleEditTotalClick}
+                          className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+                        >
+                          Edit
+                        </button>
+                      )}
+                    </div>
+                    {editingTotal ? (
+                      <div className="mt-2 space-y-3">
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={totalForm}
+                            onChange={(e) => setTotalForm(e.target.value)}
+                            className="w-full border border-gray-300 rounded-lg pl-7 pr-3 py-2 text-xl font-bold text-green-600 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          />
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={handleSaveTotal}
+                            disabled={saving || !totalForm}
+                            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                          >
+                            {saving ? 'Saving...' : 'Save'}
+                          </button>
+                          <button
+                            onClick={handleCancelEditTotal}
+                            disabled={saving}
+                            className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-2xl font-bold text-green-600 mt-1">
+                        {formatCurrency(receipt.total_amount)}
+                      </p>
+                    )}
+                  </div>
                 </div>
               )}
             </div>

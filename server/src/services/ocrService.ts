@@ -1,5 +1,86 @@
 import { ImageAnnotatorClient } from '@google-cloud/vision';
 
+/**
+ * Merge duplicate items that appear on separate lines in Costco receipts.
+ * Costco lists each quantity as a separate line, so 2 of the same item
+ * appears as 2 separate lines with qty 1 each.
+ * This function merges them into 1 item with qty 2.
+ */
+function mergeDuplicateItems(items: Array<{
+  name: string;
+  unitPrice: number;
+  quantity: number;
+  totalPrice: number;
+  itemNumber?: string;
+}>): Array<{
+  name: string;
+  unitPrice: number;
+  quantity: number;
+  totalPrice: number;
+  itemNumber?: string;
+}> {
+  // Handle empty array
+  if (!items || items.length === 0) {
+    return [];
+  }
+
+  // Use Map to track unique items by name + price
+  const itemMap = new Map<string, {
+    name: string;
+    unitPrice: number;
+    quantity: number;
+    totalPrice: number;
+    itemNumber?: string;
+  }>();
+
+  for (const item of items) {
+    // Skip items with invalid prices
+    if (typeof item.unitPrice !== 'number' || isNaN(item.unitPrice) || item.unitPrice <= 0) {
+      continue;
+    }
+
+    // Create unique key using item number ONLY (preferred) or name + price
+    // Item number alone handles: same product with different prices (discounts, OCR errors)
+    // Example: "681467" for item number match
+    // Example: "kirkland butter|12.99" for name-based match (fallback)
+    let key: string;
+    if (item.itemNumber) {
+      // Use item number ONLY as key (merges same product even with different prices)
+      key = item.itemNumber;
+    } else {
+      // Fallback to name + price for items without item numbers
+      const normalizedName = item.name.toLowerCase().trim().replace(/\s+/g, ' ');
+      key = `${normalizedName}|${item.unitPrice.toFixed(2)}`;
+    }
+
+    console.log(`[MERGE DEBUG] Item: "${item.name}" (${item.itemNumber || 'no-id'}) | Price: ${item.unitPrice} | Key: "${key}"`);
+
+    if (itemMap.has(key)) {
+      // Duplicate found - increment quantity and accumulate total
+      const existing = itemMap.get(key)!;
+      existing.quantity += 1;
+      existing.totalPrice = Math.round((existing.totalPrice + item.totalPrice) * 100) / 100;
+      // Recalculate unit price as average
+      existing.unitPrice = Math.round((existing.totalPrice / existing.quantity) * 100) / 100;
+      console.log(`[MERGE DEBUG] -> MERGED! New qty: ${existing.quantity}, total: $${existing.totalPrice}, avg unit: $${existing.unitPrice}`);
+    } else {
+      // New unique item - add to map
+      // Keep original name casing from first occurrence
+      itemMap.set(key, {
+        name: item.name,
+        unitPrice: item.unitPrice,
+        quantity: item.quantity || 1,
+        totalPrice: item.totalPrice,
+        itemNumber: item.itemNumber,
+      });
+      console.log(`[MERGE DEBUG] -> NEW unique item added`);
+    }
+  }
+
+  // Convert Map values back to array
+  return Array.from(itemMap.values());
+}
+
 export interface ParsedItem {
   name: string;
   unitPrice: number;
@@ -268,6 +349,9 @@ class OCRService {
 
     let pendingItem: { itemNumber: string; name: string } | null = null;
 
+    // Collect raw items first (before merging duplicates)
+    const rawItems: ParsedItem[] = [];
+
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
 
@@ -276,7 +360,20 @@ class OCRService {
         continue;
       }
 
-      // Skip non-item lines
+      // These patterns should be skipped but NOT clear pending item
+      // (barcodes can appear between item name and price)
+      const skipButKeepPendingPatterns = [
+        /^0{4,}\d+\s*\//, // Barcode lines like "0000366341 / 1935001"
+        /^\d{10,}$/, // Long number-only lines (barcodes)
+      ];
+
+      // Check if this is a barcode line - skip but keep pending item
+      if (skipButKeepPendingPatterns.some(pattern => pattern.test(line))) {
+        console.log(`Skipping barcode line (keeping pending): ${line}`);
+        continue;
+      }
+
+      // Skip non-item lines - these clear pending item
       if (skipPatterns.some(pattern => pattern.test(line))) {
         pendingItem = null;
         continue;
@@ -287,7 +384,7 @@ class OCRService {
       if (priceMatch && pendingItem) {
         const price = parseFloat(priceMatch[1]);
         if (price >= 0.01 && price < 10000) {
-          result.items.push({
+          rawItems.push({
             itemNumber: pendingItem.itemNumber,
             name: pendingItem.name,
             unitPrice: price,
@@ -302,9 +399,9 @@ class OCRService {
 
       // Check for discount line (applies to last item)
       const discountMatch = line.match(discountLineRegex);
-      if (discountMatch && result.items.length > 0) {
+      if (discountMatch && rawItems.length > 0) {
         const discount = parseFloat(discountMatch[1]);
-        const lastItem = result.items[result.items.length - 1];
+        const lastItem = rawItems[rawItems.length - 1];
         lastItem.totalPrice = Math.round((lastItem.totalPrice - discount) * 100) / 100;
         lastItem.unitPrice = lastItem.totalPrice / lastItem.quantity;
         console.log(`Applied discount: -$${discount} to ${lastItem.name}`);
@@ -319,7 +416,7 @@ class OCRService {
         const price = parseFloat(itemWithPriceMatch[3]);
 
         if (name.length >= 2 && price >= 0.01 && price < 10000) {
-          result.items.push({
+          rawItems.push({
             itemNumber,
             name,
             unitPrice: price,
@@ -348,6 +445,14 @@ class OCRService {
       // Reset pending if we encounter something unexpected
       pendingItem = null;
     }
+
+    // Merge duplicate items (same name + same price)
+    console.log(`OCR extracted ${rawItems.length} raw items`);
+    const mergedItems = mergeDuplicateItems(rawItems);
+    console.log(`After merging: ${mergedItems.length} unique items`);
+
+    // Assign merged items to result
+    result.items = mergedItems;
   }
 
   /**

@@ -316,7 +316,7 @@ router.patch('/:id', authenticate, async (req: Request, res: Response): Promise<
   try {
     const userId = req.userId!;
     const { id } = req.params;
-    const { storeName, storeLocation, storeCity, storeState, storeZip, purchaseDate } = req.body;
+    const { storeName, storeLocation, storeCity, storeState, storeZip, purchaseDate, totalAmount } = req.body;
 
     // Verify receipt belongs to user
     const receipt = await ReceiptModel.findById(id, userId);
@@ -333,6 +333,7 @@ router.patch('/:id', authenticate, async (req: Request, res: Response): Promise<
     if (storeState !== undefined) updateData.store_state = storeState;
     if (storeZip !== undefined) updateData.store_zip = storeZip;
     if (purchaseDate !== undefined) updateData.purchase_date = purchaseDate;
+    if (totalAmount !== undefined) updateData.total_amount = parseFloat(totalAmount);
 
     // Update receipt
     const updatedReceipt = await ReceiptModel.update(id, userId, updateData);
