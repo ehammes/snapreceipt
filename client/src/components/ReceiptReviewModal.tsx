@@ -229,7 +229,7 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
             <div className="bg-gray-50 rounded-lg p-4">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-semibold text-gray-800">
-                  Items ({formData.items.length})
+                  Items ({formData.items.reduce((sum, item) => sum + (item.quantity || 1), 0)})
                 </h3>
               </div>
 
