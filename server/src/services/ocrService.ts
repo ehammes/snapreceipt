@@ -201,12 +201,15 @@ class OCRService {
     // Look for address patterns in the first 10 lines (usually near the top)
     const headerLines = lines.slice(0, 15);
 
+    // Street type pattern - matches both abbreviated and full words
+    const streetTypes = '(?:ST|STREET|AVE|AVENUE|BLVD|BOULEVARD|DR|DRIVE|RD|ROAD|WAY|LN|LANE|CT|COURT|PL|PLACE|PKWY|PARKWAY|HWY|HIGHWAY)';
+
     // Pattern 1: Full address on one line - "123 MAIN ST CITY, ST 12345"
-    const fullAddressRegex = /^(\d+\s+[A-Z0-9\s]+(?:ST|AVE|BLVD|DR|RD|WAY|LN|CT|PL|PKWY|HWY)\.?)\s*,?\s*([A-Z\s]+),?\s*([A-Z]{2})\s*(\d{5}(?:-\d{4})?)/i;
+    const fullAddressRegex = new RegExp(`^(\\d+\\s+[A-Z0-9\\s]+${streetTypes}\\.?)\\s*,?\\s*([A-Z\\s]+),?\\s*([A-Z]{2})\\s*(\\d{5}(?:-\\d{4})?)`, 'i');
 
     // Pattern 2: Street address with city/state/zip on separate lines
-    const streetRegex = /^(\d+\s+[A-Z0-9\s]+(?:ST|AVE|BLVD|DR|RD|WAY|LN|CT|PL|PKWY|HWY)\.?)$/i;
-    const cityStateZipRegex = /^([A-Z][A-Z\s]+),?\s*([A-Z]{2})\s*(\d{5}(?:-\d{4})?)$/i;
+    const streetRegex = new RegExp(`^(\\d+\\s+[A-Z0-9\\s]+${streetTypes}\\.?)$`, 'i');
+    const cityStateZipRegex = /^([A-Z][A-Za-z\s]+),?\s*([A-Z]{2})\s*(\d{5}(?:-\d{4})?)$/;
 
     for (let i = 0; i < headerLines.length; i++) {
       const line = headerLines[i];
@@ -348,6 +351,7 @@ class OCRService {
     const itemWithPriceRegex = /^(\d{4,7}[A-Z]?)\s+(.+?)\s+(\d+\.\d{2})\s*([A-Z])?\s*$/i;
 
     let pendingItem: { itemNumber: string; name: string } | null = null;
+    let nextPendingItem: { itemNumber: string; name: string } | null = null;
 
     // Collect raw items first (before merging duplicates)
     const rawItems: ParsedItem[] = [];
@@ -376,6 +380,7 @@ class OCRService {
       // Skip non-item lines - these clear pending item
       if (skipPatterns.some(pattern => pattern.test(line))) {
         pendingItem = null;
+        nextPendingItem = null;
         continue;
       }
 
@@ -393,7 +398,9 @@ class OCRService {
           });
           console.log(`Found item: [${pendingItem.itemNumber}] ${pendingItem.name} = $${price}`);
         }
-        pendingItem = null;
+        // Move nextPendingItem to pendingItem (handles interleaved format)
+        pendingItem = nextPendingItem;
+        nextPendingItem = null;
         continue;
       }
 
@@ -425,7 +432,8 @@ class OCRService {
           });
           console.log(`Found item (inline): [${itemNumber}] ${name} = $${price}`);
         }
-        pendingItem = null;
+        pendingItem = nextPendingItem;
+        nextPendingItem = null;
         continue;
       }
 
@@ -436,14 +444,21 @@ class OCRService {
         const name = this.cleanItemName(itemMatch[2]);
 
         if (name.length >= 2) {
-          // Store as pending, wait for price on next line
-          pendingItem = { itemNumber, name };
+          // If we already have a pending item, this new item might appear
+          // BEFORE the pending item's price (interleaved Costco format)
+          if (pendingItem) {
+            nextPendingItem = { itemNumber, name };
+            console.log(`Queued next item: [${itemNumber}] ${name} (waiting for pending item's price)`);
+          } else {
+            pendingItem = { itemNumber, name };
+          }
         }
         continue;
       }
 
       // Reset pending if we encounter something unexpected
       pendingItem = null;
+      nextPendingItem = null;
     }
 
     // Merge duplicate items (same name + same price)
