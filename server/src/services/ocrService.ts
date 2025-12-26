@@ -338,8 +338,9 @@ class OCRService {
       /^XX+/i, // Masked card numbers
     ];
 
-    // Pattern for item line: starts with item number (4-7 digits/letters), followed by name
-    const itemLineRegex = /^(\d{4,7}[A-Z]?)\s+(.+)$/i;
+    // Pattern for item line: optionally starts with tax code (E, A, etc.), then item number (4-7 digits), followed by name
+    // Examples: "1954841 IRIS BIN" or "E 1603075 ORG PFCT BAR"
+    const itemLineRegex = /^(?:[A-Z]\s+)?(\d{4,7}[A-Z]?)\s+(.+)$/i;
 
     // Pattern for price line: price followed by optional tax code (A, E, F, etc.)
     const priceLineRegex = /^(\d+\.\d{2})\s*([A-Z])?\s*$/;
@@ -347,8 +348,8 @@ class OCRService {
     // Pattern for discount line: negative price like "8.00-A"
     const discountLineRegex = /^(\d+\.\d{2})-([A-Z])?\s*$/;
 
-    // Pattern for item with price on same line
-    const itemWithPriceRegex = /^(\d{4,7}[A-Z]?)\s+(.+?)\s+(\d+\.\d{2})\s*([A-Z])?\s*$/i;
+    // Pattern for item with price on same line (with optional tax code prefix)
+    const itemWithPriceRegex = /^(?:[A-Z]\s+)?(\d{4,7}[A-Z]?)\s+(.+?)\s+(\d+\.\d{2})\s*([A-Z])?\s*$/i;
 
     let pendingItem: { itemNumber: string; name: string } | null = null;
     let nextPendingItem: { itemNumber: string; name: string } | null = null;
@@ -505,19 +506,12 @@ class OCRService {
   private extractTotal(text: string, result: ParsedReceiptData): void {
     const lines = text.split('\n').map(l => l.trim());
 
-    // Look for AMOUNT: $XXX.XX pattern (most reliable for Costco)
-    const amountMatch = text.match(/AMOUNT:\s*\$?(\d+\.\d{2})/i);
-    if (amountMatch) {
-      result.totalAmount = parseFloat(amountMatch[1]);
-      console.log(`Found total from AMOUNT: $${result.totalAmount}`);
-      return;
-    }
-
-    // Look for **** TOTAL followed by card number, then amount
+    // PRIORITY 1: Look for FIRST **** TOTAL followed by card number, then amount
+    // This is the actual receipt total (before any split payment sections)
     // Pattern in Costco receipts:
     //   **** TOTAL
     //   XXXXXXXXXXXX5089
-    //   407.23
+    //   574.40
     for (let i = 0; i < lines.length; i++) {
       if (/^\*+\s*TOTAL/i.test(lines[i])) {
         // Look for price in the next few lines (skip masked card number)
@@ -532,7 +526,23 @@ class OCRService {
       }
     }
 
-    // Look for various total patterns
+    // PRIORITY 2: Look for the LARGEST AMOUNT: $XXX.XX pattern
+    // (handles split payments where multiple AMOUNT lines exist)
+    const amountMatches = text.matchAll(/AMOUNT:\s*\$?(\d+\.\d{2})/gi);
+    let maxAmount = 0;
+    for (const match of amountMatches) {
+      const amount = parseFloat(match[1]);
+      if (amount > maxAmount) {
+        maxAmount = amount;
+      }
+    }
+    if (maxAmount > 0) {
+      result.totalAmount = maxAmount;
+      console.log(`Found total from AMOUNT (largest): $${result.totalAmount}`);
+      return;
+    }
+
+    // PRIORITY 3: Look for various total patterns
     const totalPatterns = [
       /TOTAL\s+\$?\s*(\d+\.\d{2})/i,                     // TOTAL $XX.XX
       /BALANCE\s+DUE\s+\$?\s*(\d+\.\d{2})/i,            // BALANCE DUE $XX.XX

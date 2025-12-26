@@ -686,7 +686,7 @@ const ReceiptDetail: React.FC = () => {
             <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="font-semibold text-lg text-gray-800">
-                  Items ({receipt.items?.length || 0})
+                  Items ({receipt.items?.reduce((sum, item) => sum + (item.quantity || 1), 0) || 0})
                 </h2>
               </div>
 
@@ -982,8 +982,8 @@ const ReceiptDetail: React.FC = () => {
               </p>
               {receipt.items && receipt.items.length > 0 && (
                 <p className="text-xs text-gray-500 mt-1">
-                  {receipt.items.length} item
-                  {receipt.items.length !== 1 ? 's' : ''}
+                  {receipt.items.reduce((sum, item) => sum + (item.quantity || 1), 0)} item
+                  {receipt.items.reduce((sum, item) => sum + (item.quantity || 1), 0) !== 1 ? 's' : ''}
                 </p>
               )}
             </div>
