@@ -9,6 +9,7 @@ interface ReceiptItem {
   quantity: number;
   total_price: number;
   category: string | null;
+  item_number: string | null;
 }
 
 interface Receipt {
@@ -814,7 +815,14 @@ const ReceiptDetail: React.FC = () => {
                         // View Mode
                         <div className="flex justify-between items-start">
                           <div className="flex-1">
-                            <p className="font-medium text-gray-800">{item.name}</p>
+                            <div className="flex items-center gap-2">
+                              {item.item_number && (
+                                <span className="text-xs text-gray-400 font-mono">
+                                  {item.item_number}
+                                </span>
+                              )}
+                              <p className="font-medium text-gray-800">{item.name}</p>
+                            </div>
                             <p className="text-sm text-gray-500">
                               {formatCurrency(item.unit_price)} × {item.quantity} = {formatCurrency(item.total_price)}
                             </p>

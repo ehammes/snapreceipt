@@ -112,6 +112,7 @@ router.post('/upload', upload.single('receipt'), optionalAuth, async (req: Reque
           total_price: item.totalPrice,
           category: null,
           item_order: item.item_order ?? index,  // Use OCR order or fallback to array index
+          item_number: item.itemNumber || null,  // Product ID from receipt
         }));
         savedItems = await ItemModel.createBatch(itemsToCreate);
 
@@ -162,7 +163,8 @@ router.get('/', authenticate, async (req: Request, res: Response): Promise<void>
             'quantity', i.quantity,
             'total_price', i.total_price,
             'category', i.category,
-            'item_order', i.item_order
+            'item_order', i.item_order,
+            'item_number', i.item_number
           )
           ORDER BY i.item_order, i.id
         ) FILTER (WHERE i.id IS NOT NULL), '[]') as items
@@ -404,6 +406,7 @@ router.post('/save-guest', authenticate, async (req: Request, res: Response): Pr
         total_price: item.totalPrice || 0,
         category: item.category || null,
         item_order: item.item_order ?? index,  // Use provided order or array index
+        item_number: item.itemNumber || null,
       }));
       savedItems = await ItemModel.createBatch(itemsToCreate);
 

@@ -9,6 +9,7 @@ export interface Item {
   total_price: number;
   category: string | null;
   item_order: number;
+  item_number: string | null;
 }
 
 export interface CreateItemData {
@@ -19,13 +20,14 @@ export interface CreateItemData {
   total_price: number;
   category?: string | null;
   item_order?: number;
+  item_number?: string | null;
 }
 
 export const ItemModel = {
   async create(data: CreateItemData): Promise<Item> {
     const result = await pool.query(
-      `INSERT INTO items (receipt_id, name, unit_price, quantity, total_price, category, item_order)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO items (receipt_id, name, unit_price, quantity, total_price, category, item_order, item_number)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING *`,
       [
         data.receipt_id,
@@ -35,6 +37,7 @@ export const ItemModel = {
         data.total_price,
         data.category || null,
         data.item_order ?? 0,
+        data.item_number || null,
       ]
     );
     return result.rows[0];
@@ -60,7 +63,7 @@ export const ItemModel = {
     for (let idx = 0; idx < items.length; idx++) {
       const item = items[idx];
       placeholders.push(
-        `($${paramCount++}, $${paramCount++}, $${paramCount++}, $${paramCount++}, $${paramCount++}, $${paramCount++}, $${paramCount++})`
+        `($${paramCount++}, $${paramCount++}, $${paramCount++}, $${paramCount++}, $${paramCount++}, $${paramCount++}, $${paramCount++}, $${paramCount++})`
       );
       values.push(
         item.receipt_id,
@@ -69,12 +72,13 @@ export const ItemModel = {
         item.quantity,
         item.total_price,
         item.category || null,
-        item.item_order ?? idx  // Use provided order or array index as fallback
+        item.item_order ?? idx,  // Use provided order or array index as fallback
+        item.item_number || null
       );
     }
 
     const result = await pool.query(
-      `INSERT INTO items (receipt_id, name, unit_price, quantity, total_price, category, item_order)
+      `INSERT INTO items (receipt_id, name, unit_price, quantity, total_price, category, item_order, item_number)
        VALUES ${placeholders.join(', ')}
        RETURNING *`,
       values

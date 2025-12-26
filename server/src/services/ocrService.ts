@@ -368,12 +368,9 @@ class OCRService {
     // Note: $ can be OCR error for 8 or S
     const itemWithPriceRegex = /^(?:[A-Z]\s+)?([$]?\d{4,7}[A-Z]?)\s+(.+?)\s+(\d+\.\d{2})\s*([A-Z])?\s*$/i;
 
-    // Track pending items waiting for prices
-    let pendingItem: { itemNumber: string; name: string; order: number } | null = null;
-    let nextPendingItem: { itemNumber: string; name: string; order: number } | null = null;
+    // Track pending items waiting for prices (queue to handle multiple consecutive items)
+    const pendingItems: Array<{ itemNumber: string; name: string; order: number }> = [];
     let orphanPrice: { price: number; order: number } | null = null;
-    let pendingItemWaiting = false;
-    let priceSeenSincePending = false;
 
     // Collect raw items first (before merging duplicates)
     // Include order to track position on receipt
@@ -388,13 +385,19 @@ class OCRService {
       }
 
       // These patterns should be skipped but NOT clear pending item
-      // (barcodes can appear between item name and price)
+      // (barcodes and section markers can appear between item name and price due to OCR ordering)
       const skipButKeepPendingPatterns = [
         /^0{4,}\d+\s*\//, // Barcode lines like "0000366341 / 1935001"
         /^\d{10,}$/, // Long number-only lines (barcodes)
         /^[A-Z]$/, // Single letter lines (tax codes like "E" that got separated)
         /^[A-Z]{2,6}$/, // Multiple letter lines (tax codes like "EEE" or "EEEEEE")
         /[^\x00-\x7F]/, // Lines with non-ASCII characters (OCR garbage like "ययययय")
+        /^SUBTOTAL$/i, // Subtotal marker (price may come after in OCR)
+        /^TAX$/i, // Tax marker
+        /^\*+\s*TOTAL/i, // Total marker
+        /^XXXX+\d+/, // Masked card numbers
+        /^AID:/i, // Card AID
+        /^H$/, // Single H (often appears after card info)
       ];
 
       // Check if this is a line to skip but keep pending item
@@ -403,10 +406,9 @@ class OCRService {
         continue;
       }
 
-      // Skip non-item lines - these clear pending item
+      // Skip non-item lines - these clear pending items queue
       if (skipPatterns.some(pattern => pattern.test(line))) {
-        pendingItem = null;
-        nextPendingItem = null;
+        pendingItems.length = 0; // Clear the queue
         continue;
       }
 
@@ -415,52 +417,18 @@ class OCRService {
       if (priceMatch) {
         const price = parseFloat(priceMatch[1]);
         if (price >= 0.01 && price < 10000) {
-          if (pendingItem) {
-            // Determine which item gets this price
-            if (nextPendingItem && !pendingItemWaiting) {
-              // First price after two consecutive items: goes to nextPendingItem (immediate predecessor)
-              rawItems.push({
-                itemNumber: nextPendingItem.itemNumber,
-                name: nextPendingItem.name,
-                unitPrice: price,
-                quantity: 1,
-                totalPrice: price,
-                order: nextPendingItem.order,
-              });
-              console.log(`Found item: [${nextPendingItem.itemNumber}] ${nextPendingItem.name} = $${price} (order: ${nextPendingItem.order})`);
-              nextPendingItem = null;
-              pendingItemWaiting = true; // pendingItem now gets priority for next price
-              priceSeenSincePending = true; // A price was seen
-            } else if (pendingItemWaiting) {
-              // pendingItem has been waiting - give it this price
-              rawItems.push({
-                itemNumber: pendingItem.itemNumber,
-                name: pendingItem.name,
-                unitPrice: price,
-                quantity: 1,
-                totalPrice: price,
-                order: pendingItem.order,
-              });
-              console.log(`Found item (was waiting): [${pendingItem.itemNumber}] ${pendingItem.name} = $${price} (order: ${pendingItem.order})`);
-              pendingItem = nextPendingItem;
-              nextPendingItem = null;
-              pendingItemWaiting = false;
-              priceSeenSincePending = (pendingItem !== null); // Reset if there's still a pending item
-            } else {
-              // Normal case: only pendingItem exists, assign price to it
-              rawItems.push({
-                itemNumber: pendingItem.itemNumber,
-                name: pendingItem.name,
-                unitPrice: price,
-                quantity: 1,
-                totalPrice: price,
-                order: pendingItem.order,
-              });
-              console.log(`Found item: [${pendingItem.itemNumber}] ${pendingItem.name} = $${price} (order: ${pendingItem.order})`);
-              pendingItem = null;
-              pendingItemWaiting = false;
-              priceSeenSincePending = false;
-            }
+          if (pendingItems.length > 0) {
+            // Assign price to the first pending item (FIFO queue)
+            const item = pendingItems.shift()!;
+            rawItems.push({
+              itemNumber: item.itemNumber,
+              name: item.name,
+              unitPrice: price,
+              quantity: 1,
+              totalPrice: price,
+              order: item.order,
+            });
+            console.log(`Found item: [${item.itemNumber}] ${item.name} = $${price} (order: ${item.order})`);
           } else {
             // No pending item - save as orphan price for potential later use
             orphanPrice = { price, order: i };
@@ -484,18 +452,18 @@ class OCRService {
       // Check for item with price on same line
       const itemWithPriceMatch = line.match(itemWithPriceRegex);
       if (itemWithPriceMatch) {
-        // First, resolve any pending item using orphanPrice if available
-        if (pendingItem && orphanPrice) {
+        // First, resolve any pending items using orphanPrice if available
+        if (pendingItems.length > 0 && orphanPrice) {
+          const item = pendingItems.shift()!;
           rawItems.push({
-            itemNumber: pendingItem.itemNumber,
-            name: pendingItem.name,
+            itemNumber: item.itemNumber,
+            name: item.name,
             unitPrice: orphanPrice.price,
             quantity: 1,
             totalPrice: orphanPrice.price,
-            order: pendingItem.order,
+            order: item.order,
           });
-          console.log(`Found item (using orphan price before inline): [${pendingItem.itemNumber}] ${pendingItem.name} = $${orphanPrice.price} (order: ${pendingItem.order})`);
-          pendingItem = null;
+          console.log(`Found item (using orphan price before inline): [${item.itemNumber}] ${item.name} = $${orphanPrice.price} (order: ${item.order})`);
           orphanPrice = null;
         }
 
@@ -514,8 +482,6 @@ class OCRService {
           });
           console.log(`Found item (inline): [${itemNumber}] ${name} = $${price} (order: ${i})`);
         }
-        pendingItem = nextPendingItem;
-        nextPendingItem = null;
         continue;
       }
 
@@ -526,62 +492,34 @@ class OCRService {
         const name = this.cleanItemName(itemMatch[2]);
 
         if (name.length >= 2) {
-          if (pendingItem && !priceSeenSincePending) {
-            // Items are consecutive (no price between them) - queue as nextPendingItem
-            if (nextPendingItem) {
-              // Already have 2 pending items - need to resolve pendingItem first
-              if (orphanPrice) {
-                rawItems.push({
-                  itemNumber: pendingItem.itemNumber,
-                  name: pendingItem.name,
-                  unitPrice: orphanPrice.price,
-                  quantity: 1,
-                  totalPrice: orphanPrice.price,
-                  order: pendingItem.order,
-                });
-                console.log(`Found item (using orphan price): [${pendingItem.itemNumber}] ${pendingItem.name} = $${orphanPrice.price} (order: ${pendingItem.order})`);
-                orphanPrice = null;
-              } else {
-                console.log(`Warning: Skipping item without price: [${pendingItem.itemNumber}] ${pendingItem.name}`);
-              }
-              pendingItem = nextPendingItem;
-            }
-            nextPendingItem = { itemNumber, name, order: i };
-            console.log(`Queued next item (consecutive): [${itemNumber}] ${name} (order: ${i})`);
-          } else if (pendingItem && priceSeenSincePending) {
-            // Price was seen since pendingItem - items are NOT consecutive
-            // Current pendingItem should get the next price, then this new item becomes pendingItem
-            console.log(`New item after price: [${itemNumber}] ${name} - will wait for pendingItem ${pendingItem.name} to get its price`);
-            // Queue as nextPendingItem but mark that it's NOT consecutive
-            nextPendingItem = { itemNumber, name, order: i };
-            pendingItemWaiting = true; // Force pendingItem to get next price
-            priceSeenSincePending = false;
-          } else {
-            pendingItem = { itemNumber, name, order: i };
-            priceSeenSincePending = false;
-          }
+          // Add to pending items queue
+          pendingItems.push({ itemNumber, name, order: i });
+          console.log(`Queued item: [${itemNumber}] ${name} (order: ${i})`);
         }
         continue;
       }
 
-      // Reset pending if we encounter something unexpected
-      pendingItem = null;
-      nextPendingItem = null;
+      // Unrecognized line - don't clear pending items (could be noise between item and price)
     }
 
-    // Handle any remaining pending items at the end
-    if (pendingItem && orphanPrice) {
+    // Handle any remaining pending items at the end using orphan price
+    while (pendingItems.length > 0 && orphanPrice) {
+      const item = pendingItems.shift()!;
       rawItems.push({
-        itemNumber: pendingItem.itemNumber,
-        name: pendingItem.name,
+        itemNumber: item.itemNumber,
+        name: item.name,
         unitPrice: orphanPrice.price,
         quantity: 1,
         totalPrice: orphanPrice.price,
-        order: pendingItem.order,
+        order: item.order,
       });
-      console.log(`Found item (end, using orphan price): [${pendingItem.itemNumber}] ${pendingItem.name} = $${orphanPrice.price} (order: ${pendingItem.order})`);
-    } else if (pendingItem) {
-      console.log(`Warning: Item at end without price: [${pendingItem.itemNumber}] ${pendingItem.name}`);
+      console.log(`Found item (end, using orphan price): [${item.itemNumber}] ${item.name} = $${orphanPrice.price} (order: ${item.order})`);
+      orphanPrice = null;
+    }
+
+    // Log any items that couldn't be matched with prices
+    for (const item of pendingItems) {
+      console.log(`Warning: Item without price: [${item.itemNumber}] ${item.name}`);
     }
 
     // Merge duplicate items (same name + same price)
@@ -628,8 +566,23 @@ class OCRService {
   private extractTotal(text: string, result: ParsedReceiptData): void {
     const lines = text.split('\n').map(l => l.trim());
 
-    // PRIORITY 1: Look for FIRST **** TOTAL followed by card number, then amount
-    // This is the actual receipt total (before any split payment sections)
+    // PRIORITY 1: Look for AMOUNT: $XXX.XX pattern (most reliable)
+    // This is explicitly labeled and less prone to OCR ordering issues
+    const amountMatches = text.matchAll(/AMOUNT:\s*\$?(\d+\.\d{2})/gi);
+    let maxAmount = 0;
+    for (const match of amountMatches) {
+      const amount = parseFloat(match[1]);
+      if (amount > maxAmount) {
+        maxAmount = amount;
+      }
+    }
+    if (maxAmount > 0) {
+      result.totalAmount = maxAmount;
+      console.log(`Found total from AMOUNT (largest): $${result.totalAmount}`);
+      return;
+    }
+
+    // PRIORITY 2: Look for **** TOTAL followed by card number, then amount
     // Pattern in Costco receipts:
     //   **** TOTAL
     //   XXXXXXXXXXXX5089
@@ -646,22 +599,6 @@ class OCRService {
           }
         }
       }
-    }
-
-    // PRIORITY 2: Look for the LARGEST AMOUNT: $XXX.XX pattern
-    // (handles split payments where multiple AMOUNT lines exist)
-    const amountMatches = text.matchAll(/AMOUNT:\s*\$?(\d+\.\d{2})/gi);
-    let maxAmount = 0;
-    for (const match of amountMatches) {
-      const amount = parseFloat(match[1]);
-      if (amount > maxAmount) {
-        maxAmount = amount;
-      }
-    }
-    if (maxAmount > 0) {
-      result.totalAmount = maxAmount;
-      console.log(`Found total from AMOUNT (largest): $${result.totalAmount}`);
-      return;
     }
 
     // PRIORITY 3: Look for various total patterns
