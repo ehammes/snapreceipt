@@ -32,7 +32,8 @@ CREATE TABLE IF NOT EXISTS items (
     unit_price DECIMAL(10,2) NOT NULL,
     quantity INTEGER NOT NULL,
     total_price DECIMAL(10,2) NOT NULL,
-    category VARCHAR(100)
+    category VARCHAR(100),
+    item_order INTEGER DEFAULT 0
 );
 
 -- Create indexes for better query performance

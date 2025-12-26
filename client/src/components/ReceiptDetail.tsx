@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { CATEGORIES } from '../constants/categories';
 
@@ -87,6 +87,10 @@ const ReceiptDetail: React.FC = () => {
   // Total amount edit state
   const [editingTotal, setEditingTotal] = useState(false);
   const [totalForm, setTotalForm] = useState('');
+
+  // Item sorting state
+  const [itemSortBy, setItemSortBy] = useState<'receipt' | 'totalPrice'>('receipt');
+  const [itemSortOrder, setItemSortOrder] = useState<'asc' | 'desc'>('asc');
 
   useEffect(() => {
     if (id) {
@@ -214,6 +218,26 @@ const ReceiptDetail: React.FC = () => {
       setSaving(false);
     }
   };
+
+  // Sorted items memo
+  const sortedItems = useMemo(() => {
+    if (!receipt?.items) return [];
+
+    const items = [...receipt.items];
+
+    if (itemSortBy === 'receipt') {
+      // Default receipt order - items are already in receipt order from API
+      // Just apply asc/desc
+      return itemSortOrder === 'asc' ? items : [...items].reverse();
+    }
+
+    // Sort by total price (unit_price * quantity)
+    return items.sort((a, b) => {
+      const totalA = a.unit_price * a.quantity;
+      const totalB = b.unit_price * b.quantity;
+      return itemSortOrder === 'asc' ? totalA - totalB : totalB - totalA;
+    });
+  }, [receipt?.items, itemSortBy, itemSortOrder]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -684,16 +708,41 @@ const ReceiptDetail: React.FC = () => {
 
             {/* Items List Card */}
             <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6">
-              <div className="flex justify-between items-center mb-4">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-4">
                 <h2 className="font-semibold text-lg text-gray-800">
                   Items ({receipt.items?.reduce((sum, item) => sum + (item.quantity || 1), 0) || 0})
                 </h2>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={itemSortBy}
+                    onChange={(e) => setItemSortBy(e.target.value as 'receipt' | 'totalPrice')}
+                    className="text-sm border border-gray-300 rounded-lg px-2 py-1 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="receipt">Receipt Order</option>
+                    <option value="totalPrice">Total Price</option>
+                  </select>
+                  <button
+                    onClick={() => setItemSortOrder(itemSortOrder === 'asc' ? 'desc' : 'asc')}
+                    className="p-1 text-gray-600 hover:text-blue-600 hover:bg-gray-100 rounded"
+                    title={itemSortOrder === 'asc' ? 'Ascending' : 'Descending'}
+                  >
+                    {itemSortOrder === 'asc' ? (
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
+                      </svg>
+                    ) : (
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h9m5-4v12m0 0l-4-4m4 4l4-4" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
               </div>
 
               {/* Items List */}
-              {receipt.items && receipt.items.length > 0 ? (
+              {sortedItems.length > 0 ? (
                 <div className="max-h-96 overflow-y-auto space-y-3 mb-4">
-                  {receipt.items.map((item) => (
+                  {sortedItems.map((item) => (
                     <div
                       key={item.id}
                       className="bg-gray-50 rounded-lg p-3"

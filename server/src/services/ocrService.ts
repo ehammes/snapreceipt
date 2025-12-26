@@ -5,6 +5,7 @@ import { ImageAnnotatorClient } from '@google-cloud/vision';
  * Costco lists each quantity as a separate line, so 2 of the same item
  * appears as 2 separate lines with qty 1 each.
  * This function merges them into 1 item with qty 2.
+ * Preserves the original order based on first occurrence on receipt.
  */
 function mergeDuplicateItems(items: Array<{
   name: string;
@@ -12,12 +13,14 @@ function mergeDuplicateItems(items: Array<{
   quantity: number;
   totalPrice: number;
   itemNumber?: string;
+  order: number;  // Track position on receipt
 }>): Array<{
   name: string;
   unitPrice: number;
   quantity: number;
   totalPrice: number;
   itemNumber?: string;
+  item_order: number;  // Order for database storage
 }> {
   // Handle empty array
   if (!items || items.length === 0) {
@@ -31,6 +34,7 @@ function mergeDuplicateItems(items: Array<{
     quantity: number;
     totalPrice: number;
     itemNumber?: string;
+    order: number;  // Keep earliest order
   }>();
 
   for (const item of items) {
@@ -53,7 +57,7 @@ function mergeDuplicateItems(items: Array<{
       key = `${normalizedName}|${item.unitPrice.toFixed(2)}`;
     }
 
-    console.log(`[MERGE DEBUG] Item: "${item.name}" (${item.itemNumber || 'no-id'}) | Price: ${item.unitPrice} | Key: "${key}"`);
+    console.log(`[MERGE DEBUG] Item: "${item.name}" (${item.itemNumber || 'no-id'}) | Price: ${item.unitPrice} | Order: ${item.order} | Key: "${key}"`);
 
     if (itemMap.has(key)) {
       // Duplicate found - increment quantity and accumulate total
@@ -62,6 +66,8 @@ function mergeDuplicateItems(items: Array<{
       existing.totalPrice = Math.round((existing.totalPrice + item.totalPrice) * 100) / 100;
       // Recalculate unit price as average
       existing.unitPrice = Math.round((existing.totalPrice / existing.quantity) * 100) / 100;
+      // Keep the earliest order (first occurrence on receipt)
+      existing.order = Math.min(existing.order, item.order);
       console.log(`[MERGE DEBUG] -> MERGED! New qty: ${existing.quantity}, total: $${existing.totalPrice}, avg unit: $${existing.unitPrice}`);
     } else {
       // New unique item - add to map
@@ -72,13 +78,21 @@ function mergeDuplicateItems(items: Array<{
         quantity: item.quantity || 1,
         totalPrice: item.totalPrice,
         itemNumber: item.itemNumber,
+        order: item.order,
       });
       console.log(`[MERGE DEBUG] -> NEW unique item added`);
     }
   }
 
-  // Convert Map values back to array
-  return Array.from(itemMap.values());
+  // Convert Map values back to array and sort by original receipt order
+  const mergedItems = Array.from(itemMap.values());
+  mergedItems.sort((a, b) => a.order - b.order);
+
+  // Return items with item_order field for database storage
+  return mergedItems.map(({ order, ...item }) => ({
+    ...item,
+    item_order: order,  // Rename to match database column
+  }));
 }
 
 export interface ParsedItem {
@@ -87,6 +101,7 @@ export interface ParsedItem {
   quantity: number;
   totalPrice: number;
   itemNumber?: string;
+  item_order?: number;  // Order on receipt (for sorting)
 }
 
 export interface ParsedReceiptData {
@@ -351,11 +366,12 @@ class OCRService {
     // Pattern for item with price on same line (with optional tax code prefix)
     const itemWithPriceRegex = /^(?:[A-Z]\s+)?(\d{4,7}[A-Z]?)\s+(.+?)\s+(\d+\.\d{2})\s*([A-Z])?\s*$/i;
 
-    let pendingItem: { itemNumber: string; name: string } | null = null;
-    let nextPendingItem: { itemNumber: string; name: string } | null = null;
+    let pendingItem: { itemNumber: string; name: string; order: number } | null = null;
+    let nextPendingItem: { itemNumber: string; name: string; order: number } | null = null;
 
     // Collect raw items first (before merging duplicates)
-    const rawItems: ParsedItem[] = [];
+    // Include order to track position on receipt
+    const rawItems: Array<ParsedItem & { order: number }> = [];
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
@@ -396,8 +412,9 @@ class OCRService {
             unitPrice: price,
             quantity: 1,
             totalPrice: price,
+            order: pendingItem.order,  // Use order from when item was first seen
           });
-          console.log(`Found item: [${pendingItem.itemNumber}] ${pendingItem.name} = $${price}`);
+          console.log(`Found item: [${pendingItem.itemNumber}] ${pendingItem.name} = $${price} (order: ${pendingItem.order})`);
         }
         // Move nextPendingItem to pendingItem (handles interleaved format)
         pendingItem = nextPendingItem;
@@ -430,8 +447,9 @@ class OCRService {
             unitPrice: price,
             quantity: 1,
             totalPrice: price,
+            order: i,  // Use current line number as order
           });
-          console.log(`Found item (inline): [${itemNumber}] ${name} = $${price}`);
+          console.log(`Found item (inline): [${itemNumber}] ${name} = $${price} (order: ${i})`);
         }
         pendingItem = nextPendingItem;
         nextPendingItem = null;
@@ -448,10 +466,10 @@ class OCRService {
           // If we already have a pending item, this new item might appear
           // BEFORE the pending item's price (interleaved Costco format)
           if (pendingItem) {
-            nextPendingItem = { itemNumber, name };
-            console.log(`Queued next item: [${itemNumber}] ${name} (waiting for pending item's price)`);
+            nextPendingItem = { itemNumber, name, order: i };
+            console.log(`Queued next item: [${itemNumber}] ${name} (waiting for pending item's price) (order: ${i})`);
           } else {
-            pendingItem = { itemNumber, name };
+            pendingItem = { itemNumber, name, order: i };
           }
         }
         continue;

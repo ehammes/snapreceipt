@@ -104,13 +104,14 @@ router.post('/upload', upload.single('receipt'), optionalAuth, async (req: Reque
       // Save items as batch
       let savedItems: any[] = [];
       if (ocrData.items.length > 0) {
-        const itemsToCreate = ocrData.items.map(item => ({
+        const itemsToCreate = ocrData.items.map((item, index) => ({
           receipt_id: receipt.id,
           name: item.name,
           unit_price: item.unitPrice,
           quantity: item.quantity,
           total_price: item.totalPrice,
           category: null,
+          item_order: item.item_order ?? index,  // Use OCR order or fallback to array index
         }));
         savedItems = await ItemModel.createBatch(itemsToCreate);
 
@@ -160,8 +161,10 @@ router.get('/', authenticate, async (req: Request, res: Response): Promise<void>
             'unit_price', i.unit_price,
             'quantity', i.quantity,
             'total_price', i.total_price,
-            'category', i.category
+            'category', i.category,
+            'item_order', i.item_order
           )
+          ORDER BY i.item_order, i.id
         ) FILTER (WHERE i.id IS NOT NULL), '[]') as items
       FROM receipts r
       LEFT JOIN items i ON r.id = i.receipt_id
@@ -393,13 +396,14 @@ router.post('/save-guest', authenticate, async (req: Request, res: Response): Pr
     // Save items if present
     let savedItems: any[] = [];
     if (items && items.length > 0) {
-      const itemsToCreate = items.map((item: any) => ({
+      const itemsToCreate = items.map((item: any, index: number) => ({
         receipt_id: receipt.id,
         name: item.name,
         unit_price: item.unitPrice || 0,
         quantity: item.quantity || 1,
         total_price: item.totalPrice || 0,
         category: item.category || null,
+        item_order: item.item_order ?? index,  // Use provided order or array index
       }));
       savedItems = await ItemModel.createBatch(itemsToCreate);
 

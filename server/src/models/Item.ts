@@ -8,6 +8,7 @@ export interface Item {
   quantity: number;
   total_price: number;
   category: string | null;
+  item_order: number;
 }
 
 export interface CreateItemData {
@@ -17,13 +18,14 @@ export interface CreateItemData {
   quantity: number;
   total_price: number;
   category?: string | null;
+  item_order?: number;
 }
 
 export const ItemModel = {
   async create(data: CreateItemData): Promise<Item> {
     const result = await pool.query(
-      `INSERT INTO items (receipt_id, name, unit_price, quantity, total_price, category)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO items (receipt_id, name, unit_price, quantity, total_price, category, item_order)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING *`,
       [
         data.receipt_id,
@@ -32,6 +34,7 @@ export const ItemModel = {
         data.quantity,
         data.total_price,
         data.category || null,
+        data.item_order ?? 0,
       ]
     );
     return result.rows[0];
@@ -39,7 +42,7 @@ export const ItemModel = {
 
   async findByReceiptId(receiptId: string): Promise<Item[]> {
     const result = await pool.query(
-      'SELECT * FROM items WHERE receipt_id = $1 ORDER BY name',
+      'SELECT * FROM items WHERE receipt_id = $1 ORDER BY item_order, id',
       [receiptId]
     );
     return result.rows;
@@ -54,9 +57,10 @@ export const ItemModel = {
     const placeholders: string[] = [];
     let paramCount = 1;
 
-    for (const item of items) {
+    for (let idx = 0; idx < items.length; idx++) {
+      const item = items[idx];
       placeholders.push(
-        `($${paramCount++}, $${paramCount++}, $${paramCount++}, $${paramCount++}, $${paramCount++}, $${paramCount++})`
+        `($${paramCount++}, $${paramCount++}, $${paramCount++}, $${paramCount++}, $${paramCount++}, $${paramCount++}, $${paramCount++})`
       );
       values.push(
         item.receipt_id,
@@ -64,12 +68,13 @@ export const ItemModel = {
         item.unit_price,
         item.quantity,
         item.total_price,
-        item.category || null
+        item.category || null,
+        item.item_order ?? idx  // Use provided order or array index as fallback
       );
     }
 
     const result = await pool.query(
-      `INSERT INTO items (receipt_id, name, unit_price, quantity, total_price, category)
+      `INSERT INTO items (receipt_id, name, unit_price, quantity, total_price, category, item_order)
        VALUES ${placeholders.join(', ')}
        RETURNING *`,
       values
