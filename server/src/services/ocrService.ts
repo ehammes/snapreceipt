@@ -371,11 +371,56 @@ class OCRService {
 
     // Track pending items waiting for prices (queue to handle multiple consecutive items)
     const pendingItems: Array<{ itemNumber: string; name: string; order: number }> = [];
+    // Buffer for collecting consecutive prices when multiple items are pending
+    const pendingPrices: Array<{ price: number; order: number }> = [];
     let orphanPrice: { price: number; order: number } | null = null;
 
     // Collect raw items first (before merging duplicates)
     // Include order to track position on receipt
     const rawItems: Array<ParsedItem & { order: number }> = [];
+
+    // Helper function to match pending items with pending prices
+    const matchPendingItemsAndPrices = () => {
+      if (pendingItems.length === 0 || pendingPrices.length === 0) return;
+
+      // When we have equal counts, prices may be in reverse order due to multi-column OCR
+      // Match them in reverse order (last price to first item)
+      if (pendingItems.length === pendingPrices.length) {
+        console.log(`Matching ${pendingItems.length} items with ${pendingPrices.length} prices (reverse order for multi-column)`);
+        // Reverse prices to match items correctly
+        const reversedPrices = [...pendingPrices].reverse();
+        for (let k = 0; k < pendingItems.length; k++) {
+          const item = pendingItems[k];
+          const priceInfo = reversedPrices[k];
+          rawItems.push({
+            itemNumber: item.itemNumber,
+            name: item.name,
+            unitPrice: priceInfo.price,
+            quantity: 1,
+            totalPrice: priceInfo.price,
+            order: item.order,
+          });
+          console.log(`Found item (multi-column match): [${item.itemNumber}] ${item.name} = $${priceInfo.price} (order: ${item.order})`);
+        }
+        pendingItems.length = 0;
+        pendingPrices.length = 0;
+      } else {
+        // Different counts - use FIFO matching for what we can
+        while (pendingItems.length > 0 && pendingPrices.length > 0) {
+          const item = pendingItems.shift()!;
+          const priceInfo = pendingPrices.shift()!;
+          rawItems.push({
+            itemNumber: item.itemNumber,
+            name: item.name,
+            unitPrice: priceInfo.price,
+            quantity: 1,
+            totalPrice: priceInfo.price,
+            order: item.order,
+          });
+          console.log(`Found item (FIFO match): [${item.itemNumber}] ${item.name} = $${priceInfo.price} (order: ${item.order})`);
+        }
+      }
+    };
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
@@ -409,7 +454,9 @@ class OCRService {
 
       // Skip non-item lines - these clear pending items queue
       if (skipPatterns.some(pattern => pattern.test(line))) {
-        pendingItems.length = 0; // Clear the queue
+        matchPendingItemsAndPrices(); // Try to match before clearing
+        pendingItems.length = 0;
+        pendingPrices.length = 0;
         continue;
       }
 
@@ -419,17 +466,14 @@ class OCRService {
         const price = parseFloat(priceMatch[1]);
         if (price >= 0.01 && price < 10000) {
           if (pendingItems.length > 0) {
-            // Assign price to the first pending item (FIFO queue)
-            const item = pendingItems.shift()!;
-            rawItems.push({
-              itemNumber: item.itemNumber,
-              name: item.name,
-              unitPrice: price,
-              quantity: 1,
-              totalPrice: price,
-              order: item.order,
-            });
-            console.log(`Found item: [${item.itemNumber}] ${item.name} = $${price} (order: ${item.order})`);
+            // Add to pending prices buffer
+            pendingPrices.push({ price, order: i });
+            console.log(`Buffered price: $${price} (pending items: ${pendingItems.length}, pending prices: ${pendingPrices.length})`);
+
+            // If we have only 1 pending item, match immediately (no multi-column ambiguity)
+            if (pendingItems.length === 1 && pendingPrices.length === 1) {
+              matchPendingItemsAndPrices();
+            }
           } else {
             // No pending item - save as orphan price for potential later use
             orphanPrice = { price, order: i };
@@ -489,6 +533,12 @@ class OCRService {
       // Check if this is an item line (number + name, price on next line)
       const itemMatch = line.match(itemLineRegex);
       if (itemMatch) {
+        // Before adding new item, try to match any pending items with buffered prices
+        // This handles the case where prices were collected and now we're seeing the next item
+        if (pendingPrices.length > 0 && pendingItems.length > 0) {
+          matchPendingItemsAndPrices();
+        }
+
         const itemNumber = itemMatch[1];
         const name = this.cleanItemName(itemMatch[2]);
 
@@ -503,7 +553,10 @@ class OCRService {
       // Unrecognized line - don't clear pending items (could be noise between item and price)
     }
 
-    // Handle any remaining pending items at the end using orphan price
+    // At end of lines, try to match any remaining pending items with buffered prices
+    matchPendingItemsAndPrices();
+
+    // Handle any remaining pending items using orphan price
     while (pendingItems.length > 0 && orphanPrice) {
       const item = pendingItems.shift()!;
       rawItems.push({
@@ -567,27 +620,12 @@ class OCRService {
   private extractTotal(text: string, result: ParsedReceiptData): void {
     const lines = text.split('\n').map(l => l.trim());
 
-    // PRIORITY 1: Look for AMOUNT: $XXX.XX pattern (most reliable)
-    // This is explicitly labeled and less prone to OCR ordering issues
-    const amountMatches = text.matchAll(/AMOUNT:\s*\$?(\d+\.\d{2})/gi);
-    let maxAmount = 0;
-    for (const match of amountMatches) {
-      const amount = parseFloat(match[1]);
-      if (amount > maxAmount) {
-        maxAmount = amount;
-      }
-    }
-    if (maxAmount > 0) {
-      result.totalAmount = maxAmount;
-      console.log(`Found total from AMOUNT (largest): $${result.totalAmount}`);
-      return;
-    }
-
-    // PRIORITY 2: Look for **** TOTAL followed by card number, then amount
+    // PRIORITY 1: Look for FIRST **** TOTAL followed by amount
+    // This is the actual receipt total BEFORE any CC rewards or discounts
     // Pattern in Costco receipts:
     //   **** TOTAL
-    //   XXXXXXXXXXXX5089
-    //   574.40
+    //   353.04
+    // Later there may be another **** TOTAL with the amount charged to card (after rewards)
     for (let i = 0; i < lines.length; i++) {
       if (/^\*+\s*TOTAL/i.test(lines[i])) {
         // Look for price in the next few lines (skip masked card number)
@@ -602,7 +640,7 @@ class OCRService {
       }
     }
 
-    // PRIORITY 3: Look for various total patterns
+    // PRIORITY 2: Look for various total patterns
     const totalPatterns = [
       /TOTAL\s+\$?\s*(\d+\.\d{2})/i,                     // TOTAL $XX.XX
       /BALANCE\s+DUE\s+\$?\s*(\d+\.\d{2})/i,            // BALANCE DUE $XX.XX

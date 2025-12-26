@@ -294,12 +294,13 @@ router.post('/:id/items', authenticate, async (req: Request, res: Response): Pro
       category: category || null,
     });
 
-    // Recalculate receipt total
-    const allItems = await ItemModel.findByReceiptId(id);
-    const newTotal = allItems.reduce((sum, item) => sum + parseFloat(String(item.total_price)), 0);
-    await ReceiptModel.update(id, userId, { total_amount: newTotal });
+    // Note: We don't recalculate receipt total here because:
+    // 1. The OCR-extracted total includes tax, which item sum doesn't
+    // 2. User may have manually set the total
+    // User can edit total manually if needed
 
-    // Get updated receipt
+    // Get all items for response
+    const allItems = await ItemModel.findByReceiptId(id);
     const updatedReceipt = await ReceiptModel.findById(id, userId);
 
     res.status(201).json({
@@ -465,15 +466,14 @@ router.put('/:id/items/:itemId', authenticate, async (req: Request, res: Respons
     // Update item
     const updatedItem = await ItemModel.update(itemId, id, updateData);
 
-    // Recalculate receipt total
-    const allItems = await ItemModel.findByReceiptId(id);
-    const newTotal = allItems.reduce((sum, item) => sum + parseFloat(String(item.total_price)), 0);
-    await ReceiptModel.update(id, userId, { total_amount: newTotal });
+    // Note: We don't recalculate receipt total here because:
+    // 1. The OCR-extracted total includes tax, which item sum doesn't
+    // 2. User may have manually set the total
+    // User can edit total manually if needed
 
     res.json({
       success: true,
       item: updatedItem,
-      newReceiptTotal: newTotal,
     });
   } catch (error) {
     console.error('Update item error:', error);
@@ -504,15 +504,14 @@ router.delete('/:id/items/:itemId', authenticate, async (req: Request, res: Resp
     // Delete item
     await ItemModel.delete(itemId, id);
 
-    // Recalculate receipt total
-    const allItems = await ItemModel.findByReceiptId(id);
-    const newTotal = allItems.reduce((sum, item) => sum + parseFloat(String(item.total_price)), 0);
-    await ReceiptModel.update(id, userId, { total_amount: newTotal });
+    // Note: We don't recalculate receipt total here because:
+    // 1. The OCR-extracted total includes tax, which item sum doesn't
+    // 2. User may have manually set the total
+    // User can edit total manually if needed
 
     res.json({
       success: true,
       message: 'Item deleted',
-      newReceiptTotal: newTotal,
     });
   } catch (error) {
     console.error('Delete item error:', error);
