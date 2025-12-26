@@ -3,12 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import ReceiptReviewModal, { ReviewData, ReviewItem } from './ReceiptReviewModal';
 
 interface ProcessedItem {
+  id?: string;
   name: string;
   unitPrice: number;
   quantity: number;
   totalPrice: number;
   itemNumber?: string;
   item_order?: number;
+  category?: string;
 }
 
 interface ProcessedReceipt {
@@ -75,13 +77,13 @@ const ReceiptUpload: React.FC = () => {
       totalAmount: data.totalAmount || 0,
       imageUrl: data.imageUrl || '',
       items: data.items.map((item, index) => ({
-        id: `item-${index}-${Date.now()}`,
+        id: item.id || `item-${index}-${Date.now()}`,
         itemNumber: item.itemNumber || '',
         name: item.name,
         unitPrice: item.unitPrice,
         quantity: item.quantity,
         totalPrice: item.totalPrice,
-        category: 'Groceries', // Default category
+        category: item.category || 'Groceries',
       })),
     };
   };
@@ -138,11 +140,13 @@ const ReceiptUpload: React.FC = () => {
         totalAmount: data.data?.total_amount || data.data?.totalAmount || 0,
         imageUrl: data.data?.image_url || data.imageUrl || '',
         items: (data.data?.items || []).map((item: any) => ({
+          id: item.id?.toString(),
           name: item.name,
           unitPrice: parseFloat(item.unit_price) || item.unitPrice || 0,
           quantity: item.quantity || 1,
           totalPrice: parseFloat(item.total_price) || item.totalPrice || 0,
           itemNumber: item.item_number || item.itemNumber || '',
+          category: item.category || 'Groceries',
         })),
       };
 
@@ -201,10 +205,27 @@ const ReceiptUpload: React.FC = () => {
           throw new Error('Failed to update receipt');
         }
 
-        // Update items - delete existing and recreate
-        // For simplicity, we'll update each item individually
-        // First, let's navigate to the receipt detail page
-        // The user can make further edits there if needed
+        // Update each item (category and other edits)
+        for (const item of data.items) {
+          // Only update items that have a server ID (not newly added items with client IDs)
+          if (item.id && !item.id.startsWith('new-') && !item.id.startsWith('item-')) {
+            await fetch(`http://localhost:3001/api/receipts/${receiptId}/items/${item.id}`, {
+              method: 'PUT',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                name: item.name,
+                unitPrice: item.unitPrice,
+                quantity: item.quantity,
+                totalPrice: item.totalPrice,
+                category: item.category,
+                itemNumber: item.itemNumber,
+              }),
+            });
+          }
+        }
 
         navigate(`/receipts/${receiptId}`);
       }
