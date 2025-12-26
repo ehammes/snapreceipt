@@ -24,6 +24,10 @@ interface TopItem {
   quantity: number;
   totalSpent: number;
   purchaseCount: number;
+  category: string;
+  itemNumber: string;
+  lastPurchased: string;
+  priceChange: number;
 }
 
 interface CategoryBreakdown {
@@ -33,6 +37,29 @@ interface CategoryBreakdown {
 }
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D'];
+
+// Category color mapping for badges
+const CATEGORY_COLORS: Record<string, string> = {
+  'Groceries': 'bg-green-100 text-green-800',
+  'Household': 'bg-blue-100 text-blue-800',
+  'Electronics': 'bg-purple-100 text-purple-800',
+  'Clothing': 'bg-pink-100 text-pink-800',
+  'Health & Beauty': 'bg-rose-100 text-rose-800',
+  'Frozen': 'bg-cyan-100 text-cyan-800',
+  'Beverages': 'bg-amber-100 text-amber-800',
+  'Snacks': 'bg-orange-100 text-orange-800',
+  'Bakery': 'bg-yellow-100 text-yellow-800',
+  'Meat & Seafood': 'bg-red-100 text-red-800',
+  'Dairy': 'bg-indigo-100 text-indigo-800',
+  'Uncategorized': 'bg-gray-100 text-gray-800',
+};
+
+// Helper to format date
+const formatDate = (dateString: string): string => {
+  if (!dateString) return '-';
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+};
 
 type SortKey = 'name' | 'quantity' | 'totalSpent';
 type SortOrder = 'asc' | 'desc';
@@ -331,10 +358,26 @@ const AnalyticsDashboard: React.FC = () => {
                   className="bg-gray-50 p-4 rounded-lg border border-gray-200"
                 >
                   <div className="flex justify-between items-start mb-2">
-                    <h3 className="font-medium text-gray-900">{item.name}</h3>
+                    <div>
+                      <h3 className="font-medium text-gray-900">{item.name}</h3>
+                      {item.itemNumber && (
+                        <span className="text-xs text-gray-400">#{item.itemNumber}</span>
+                      )}
+                    </div>
                     <span className="text-sm font-semibold text-green-600">
                       ${item.totalSpent.toFixed(2)}
                     </span>
+                  </div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${CATEGORY_COLORS[item.category] || CATEGORY_COLORS['Uncategorized']}`}>
+                      {item.category}
+                    </span>
+                    {item.priceChange !== 0 && (
+                      <span className={`flex items-center gap-0.5 text-xs font-medium ${item.priceChange > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                        {item.priceChange > 0 ? '↑' : '↓'}
+                        {Math.abs(item.priceChange).toFixed(1)}%
+                      </span>
+                    )}
                   </div>
                   <div className="grid grid-cols-3 gap-2 text-sm text-gray-500">
                     <div>
@@ -348,8 +391,8 @@ const AnalyticsDashboard: React.FC = () => {
                       <span>{item.purchaseCount}</span>
                     </div>
                     <div>
-                      <span className="block text-xs text-gray-400">Avg Price</span>
-                      <span>${(item.totalSpent / item.quantity).toFixed(2)}</span>
+                      <span className="block text-xs text-gray-400">Last Bought</span>
+                      <span className="text-xs">{formatDate(item.lastPurchased)}</span>
                     </div>
                   </div>
                 </div>
@@ -409,10 +452,13 @@ const AnalyticsDashboard: React.FC = () => {
                     </div>
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Purchase Count
+                    Category
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Avg Price
+                    Last Purchased
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Price Trend
                   </th>
                 </tr>
               </thead>
@@ -439,21 +485,38 @@ const AnalyticsDashboard: React.FC = () => {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-500">
-                          {item.purchaseCount}{' '}
-                          {item.purchaseCount === 1 ? 'time' : 'times'}
-                        </div>
+                        <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${CATEGORY_COLORS[item.category] || CATEGORY_COLORS['Uncategorized']}`}>
+                          {item.category}
+                        </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-500">
-                          ${(item.totalSpent / item.quantity).toFixed(2)}
+                          {formatDate(item.lastPurchased)}
                         </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {item.priceChange !== 0 ? (
+                          <div className={`flex items-center gap-1 text-sm font-medium ${item.priceChange > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                            {item.priceChange > 0 ? (
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                              </svg>
+                            ) : (
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                            )}
+                            {Math.abs(item.priceChange).toFixed(1)}%
+                          </div>
+                        ) : (
+                          <div className="text-sm text-gray-400">—</div>
+                        )}
                       </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={5} className="px-6 py-12 text-center">
+                    <td colSpan={6} className="px-6 py-12 text-center">
                       <div className="text-gray-500">
                         <p className="text-lg mb-2">No items yet</p>
                         <p className="text-sm">
