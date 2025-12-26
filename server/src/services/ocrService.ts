@@ -351,6 +351,7 @@ class OCRService {
       /Date\s*of\s*Birth/i,
       /^Name:/i,
       /^XX+/i, // Masked card numbers
+      /\b(Street|St|Avenue|Ave|Boulevard|Blvd|Drive|Dr|Road|Rd|Way|Lane|Ln|Court|Ct|Place|Pl|Parkway|Pkwy|Highway|Hwy)\b/i, // Address lines
     ];
 
     // Pattern for item line: optionally starts with tax code (E, A, etc.), then item number (4-7 digits), followed by name

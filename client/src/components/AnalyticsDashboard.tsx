@@ -93,9 +93,16 @@ const AnalyticsDashboard: React.FC = () => {
     }
   };
 
+  // Auth check and fetch on mount
   useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      navigate('/login');
+      return;
+    }
     fetchAnalytics();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navigate]);
 
   const fetchAnalytics = async () => {
     try {

@@ -1,23 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-
-interface GuestReceiptData {
-  imageUrl: string;
-  storeName: string;
-  storeLocation: string;
-  storeCity: string;
-  storeState: string;
-  storeZip: string;
-  purchaseDate: string;
-  totalAmount: number;
-  items: Array<{
-    name: string;
-    quantity: number;
-    unitPrice: number;
-    totalPrice: number;
-    category?: string;
-  }>;
-}
 
 const Register: React.FC = () => {
   const navigate = useNavigate();
@@ -26,20 +8,6 @@ const Register: React.FC = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [guestData, setGuestData] = useState<GuestReceiptData | null>(null);
-  const [success, setSuccess] = useState('');
-
-  useEffect(() => {
-    const savedGuestReceipt = sessionStorage.getItem('guestReceipt');
-    if (savedGuestReceipt) {
-      try {
-        const parsed = JSON.parse(savedGuestReceipt);
-        setGuestData(parsed);
-      } catch {
-        console.error('Failed to parse guest receipt data');
-      }
-    }
-  }, []);
 
   const validateEmail = (email: string): boolean => {
     return email.includes('@') && email.includes('.');
@@ -48,7 +16,6 @@ const Register: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    setSuccess('');
 
     // Validation
     if (!validateEmail(email)) {
@@ -92,35 +59,8 @@ const Register: React.FC = () => {
       localStorage.setItem('token', registerData.token);
       localStorage.setItem('userId', registerData.userId);
 
-      // If we have guest receipt data, save it to the user's account
-      if (guestData) {
-        try {
-          const saveRes = await fetch('http://localhost:3001/api/receipts/save-guest', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${registerData.token}`,
-            },
-            body: JSON.stringify({ guestReceiptData: guestData }),
-          });
-
-          if (saveRes.ok) {
-            sessionStorage.removeItem('guestReceipt');
-            setSuccess('Account created! Your receipt has been saved.');
-            setTimeout(() => navigate('/receipts'), 1500);
-          } else {
-            // Account created but receipt save failed
-            sessionStorage.removeItem('guestReceipt');
-            setSuccess('Account created! (Receipt save failed - please re-upload)');
-            setTimeout(() => navigate('/receipts'), 1500);
-          }
-        } catch {
-          sessionStorage.removeItem('guestReceipt');
-          navigate('/receipts');
-        }
-      } else {
-        navigate('/receipts');
-      }
+      // Navigate to receipts page
+      navigate('/receipts');
     } catch (err) {
       console.error('Registration error:', err);
       setError('Connection failed. Please try again.');
@@ -132,46 +72,6 @@ const Register: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-100 py-8 px-4">
       <div className="max-w-md mx-auto">
-        {/* Guest Receipt Banner */}
-        {guestData && (
-          <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <div className="flex items-start gap-3">
-              <svg
-                className="w-6 h-6 text-blue-600 flex-shrink-0 mt-0.5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                />
-              </svg>
-              <div>
-                <h3 className="font-semibold text-blue-900">
-                  Create an account to save your uploaded receipt!
-                </h3>
-                <div className="mt-2 text-sm text-blue-700">
-                  <p>
-                    <span className="font-medium">Store:</span>{' '}
-                    {guestData.storeName || 'Costco'}
-                  </p>
-                  <p>
-                    <span className="font-medium">Total:</span> $
-                    {guestData.totalAmount?.toFixed(2) || '0.00'}
-                  </p>
-                  <p>
-                    <span className="font-medium">Items:</span>{' '}
-                    {guestData.items?.length || 0} items detected
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Registration Card */}
         <div className="bg-white rounded-lg shadow-lg p-8">
           {/* Logo/Brand */}
@@ -196,13 +96,6 @@ const Register: React.FC = () => {
               Track your Costco receipts and spending
             </p>
           </div>
-
-          {/* Success Message */}
-          {success && (
-            <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
-              {success}
-            </div>
-          )}
 
           {/* Error Message */}
           {error && (

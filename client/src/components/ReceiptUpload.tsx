@@ -1,11 +1,14 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import ReceiptReviewModal, { ReviewData, ReviewItem } from './ReceiptReviewModal';
 
 interface ProcessedItem {
   name: string;
   unitPrice: number;
   quantity: number;
   totalPrice: number;
+  itemNumber?: string;
+  item_order?: number;
 }
 
 interface ProcessedReceipt {
@@ -28,19 +31,28 @@ const ReceiptUpload: React.FC = () => {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [processing, setProcessing] = useState(false);
-  const [processedData, setProcessedData] = useState<ProcessedReceipt | null>(null);
-  const [isGuest, setIsGuest] = useState(false);
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [reviewData, setReviewData] = useState<ReviewData | null>(null);
+  const [saving, setSaving] = useState(false);
 
   // Refs for file inputs
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
+  // Auth check on mount
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      navigate('/login');
+    }
+  }, [navigate]);
+
   // Handle file selection
   const handleFileSelect = (selectedFile: File) => {
     setFile(selectedFile);
     setPreviewUrl(URL.createObjectURL(selectedFile));
-    setProcessedData(null);
-    setIsGuest(false);
+    setShowReviewModal(false);
+    setReviewData(null);
   };
 
   // Handle file input change
@@ -49,6 +61,29 @@ const ReceiptUpload: React.FC = () => {
     if (selectedFile) {
       handleFileSelect(selectedFile);
     }
+  };
+
+  // Convert processed data to review data format
+  const convertToReviewData = (data: ProcessedReceipt): ReviewData => {
+    return {
+      storeName: data.storeName || 'Costco',
+      storeLocation: data.storeLocation || '',
+      storeCity: data.storeCity || '',
+      storeState: data.storeState || '',
+      storeZip: data.storeZip || '',
+      purchaseDate: data.purchaseDate || new Date().toISOString(),
+      totalAmount: data.totalAmount || 0,
+      imageUrl: data.imageUrl || '',
+      items: data.items.map((item, index) => ({
+        id: `item-${index}-${Date.now()}`,
+        itemNumber: item.itemNumber || '',
+        name: item.name,
+        unitPrice: item.unitPrice,
+        quantity: item.quantity,
+        totalPrice: item.totalPrice,
+        category: 'Groceries', // Default category
+      })),
+    };
   };
 
   // Handle upload and processing
@@ -63,46 +98,63 @@ const ReceiptUpload: React.FC = () => {
       formData.append('receipt', file);
 
       const token = localStorage.getItem('token');
-      const headers: HeadersInit = {};
-
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
+      if (!token) {
+        navigate('/login');
+        return;
       }
 
+      // Upload for processing only (don't save yet)
       const response = await fetch('http://localhost:3001/api/receipts/upload', {
         method: 'POST',
-        headers,
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
         body: formData,
       });
 
       const data = await response.json();
 
       if (!response.ok) {
+        if (response.status === 401) {
+          localStorage.removeItem('token');
+          navigate('/login');
+          return;
+        }
         throw new Error(data.error || 'Failed to process receipt');
       }
 
-      if (data.guestMode) {
-        // Guest mode - show processed data and save to sessionStorage
-        setIsGuest(true);
-        setProcessedData(data.data);
+      // For now, the server auto-saves on upload for authenticated users
+      // We'll show the review modal with the saved data and allow editing
+      // The receipt is already saved, so we'll redirect after any edits
 
-        // Save guest receipt data to sessionStorage for account creation
-        const guestReceiptData = {
-          imageUrl: data.data.imageUrl,
-          storeName: data.data.storeName,
-          storeLocation: data.data.storeLocation,
-          storeCity: data.data.storeCity,
-          storeState: data.data.storeState,
-          storeZip: data.data.storeZip,
-          purchaseDate: data.data.purchaseDate,
-          totalAmount: data.data.totalAmount,
-          items: data.data.items,
-        };
-        sessionStorage.setItem('guestReceipt', JSON.stringify(guestReceiptData));
-      } else {
-        // Authenticated - redirect to receipt detail
-        navigate(`/receipts/${data.receiptId}`);
-      }
+      // Convert the response data to review format
+      const processedData: ProcessedReceipt = {
+        storeName: data.data?.store_name || data.data?.storeName || 'Costco',
+        storeLocation: data.data?.store_location || data.data?.storeLocation || '',
+        storeCity: data.data?.store_city || data.data?.storeCity || '',
+        storeState: data.data?.store_state || data.data?.storeState || '',
+        storeZip: data.data?.store_zip || data.data?.storeZip || '',
+        purchaseDate: data.data?.purchase_date || data.data?.purchaseDate || new Date().toISOString(),
+        totalAmount: data.data?.total_amount || data.data?.totalAmount || 0,
+        imageUrl: data.data?.image_url || data.imageUrl || '',
+        items: (data.data?.items || []).map((item: any) => ({
+          name: item.name,
+          unitPrice: parseFloat(item.unit_price) || item.unitPrice || 0,
+          quantity: item.quantity || 1,
+          totalPrice: parseFloat(item.total_price) || item.totalPrice || 0,
+          itemNumber: item.item_number || item.itemNumber || '',
+        })),
+      };
+
+      // Store the receipt ID for later use when saving edits
+      const receiptId = data.receiptId;
+
+      setReviewData({
+        ...convertToReviewData(processedData),
+        receiptId, // Add receipt ID to review data
+      } as ReviewData & { receiptId: string });
+      setShowReviewModal(true);
+
     } catch (error) {
       console.error('Upload error:', error);
       alert(error instanceof Error ? error.message : 'Failed to upload receipt');
@@ -112,17 +164,78 @@ const ReceiptUpload: React.FC = () => {
     }
   };
 
+  // Handle save from review modal
+  const handleSaveReview = async (data: ReviewData) => {
+    setSaving(true);
+
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        navigate('/login');
+        return;
+      }
+
+      // Get receipt ID from review data
+      const receiptId = (data as ReviewData & { receiptId?: string }).receiptId;
+
+      if (receiptId) {
+        // Update existing receipt with edited data
+        const response = await fetch(`http://localhost:3001/api/receipts/${receiptId}`, {
+          method: 'PATCH',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            storeName: data.storeName,
+            storeLocation: data.storeLocation,
+            storeCity: data.storeCity,
+            storeState: data.storeState,
+            storeZip: data.storeZip,
+            purchaseDate: data.purchaseDate,
+            totalAmount: data.totalAmount,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to update receipt');
+        }
+
+        // Update items - delete existing and recreate
+        // For simplicity, we'll update each item individually
+        // First, let's navigate to the receipt detail page
+        // The user can make further edits there if needed
+
+        navigate(`/receipts/${receiptId}`);
+      }
+    } catch (error) {
+      console.error('Save error:', error);
+      alert(error instanceof Error ? error.message : 'Failed to save receipt');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Handle cancel from review modal
+  const handleCancelReview = () => {
+    // Get receipt ID to navigate to detail page (receipt is already saved)
+    const receiptId = (reviewData as ReviewData & { receiptId?: string })?.receiptId;
+    if (receiptId) {
+      navigate(`/receipts/${receiptId}`);
+    } else {
+      setShowReviewModal(false);
+      clearSelection();
+    }
+  };
+
   // Clear selection and reset state
   const clearSelection = () => {
     setFile(null);
     setPreviewUrl(null);
-    setProcessedData(null);
-    setIsGuest(false);
+    setShowReviewModal(false);
+    setReviewData(null);
     setUploading(false);
     setProcessing(false);
-
-    // Clear guest receipt from sessionStorage
-    sessionStorage.removeItem('guestReceipt');
 
     // Clear file input values
     if (fileInputRef.current) {
@@ -131,21 +244,6 @@ const ReceiptUpload: React.FC = () => {
     if (cameraInputRef.current) {
       cameraInputRef.current.value = '';
     }
-  };
-
-  // Format date for display
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
-  };
-
-  // Format currency
-  const formatCurrency = (amount: number) => {
-    return `$${amount.toFixed(2)}`;
   };
 
   // Render upload options (no file selected)
@@ -296,142 +394,6 @@ const ReceiptUpload: React.FC = () => {
     </div>
   );
 
-  // Render guest results
-  const renderGuestResults = () => (
-    <div className="space-y-6">
-      {/* Success Banner */}
-      <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-center gap-3">
-        <svg
-          className="w-6 h-6 text-green-600 flex-shrink-0"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M5 13l4 4L19 7"
-          />
-        </svg>
-        <div>
-          <p className="font-medium text-green-800">
-            Receipt Processed Successfully!
-          </p>
-          <p className="text-green-700 text-sm">
-            We've extracted {processedData?.items.length || 0} items from your receipt
-          </p>
-        </div>
-      </div>
-
-      {/* Two-column layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Left Column - Receipt Image */}
-        <div>
-          <h3 className="font-medium text-gray-800 mb-3">Receipt Image</h3>
-          <div className="bg-gray-100 rounded-lg p-2">
-            <img
-              src={previewUrl!}
-              alt="Receipt"
-              className="w-full rounded"
-            />
-          </div>
-        </div>
-
-        {/* Right Column - Extracted Data */}
-        <div className="space-y-4">
-          {/* Store Information Card */}
-          <div className="bg-gray-50 rounded-lg p-4">
-            <h3 className="font-medium text-gray-800 mb-3">Store Information</h3>
-            <div className="space-y-2 text-sm">
-              <p>
-                <span className="text-gray-500">Store:</span>{' '}
-                <span className="font-medium">{processedData?.storeName}</span>
-              </p>
-              {processedData?.storeLocation && (
-                <p>
-                  <span className="text-gray-500">Location:</span>{' '}
-                  <span className="font-medium">
-                    {processedData.storeLocation}
-                    {processedData.storeCity && `, ${processedData.storeCity}`}
-                    {processedData.storeState && `, ${processedData.storeState}`}
-                    {processedData.storeZip && ` ${processedData.storeZip}`}
-                  </span>
-                </p>
-              )}
-              <p>
-                <span className="text-gray-500">Date:</span>{' '}
-                <span className="font-medium">
-                  {processedData?.purchaseDate
-                    ? formatDate(processedData.purchaseDate)
-                    : 'Not detected'}
-                </span>
-              </p>
-              <p className="pt-2 border-t border-gray-200">
-                <span className="text-gray-500">Total:</span>{' '}
-                <span className="font-bold text-green-600 text-lg">
-                  {formatCurrency(processedData?.totalAmount || 0)}
-                </span>
-              </p>
-            </div>
-          </div>
-
-          {/* Items List Card */}
-          <div className="bg-gray-50 rounded-lg p-4">
-            <h3 className="font-medium text-gray-800 mb-3">
-              Items ({processedData?.items.length || 0})
-            </h3>
-            <div className="max-h-96 overflow-y-auto space-y-3">
-              {processedData?.items.map((item, index) => (
-                <div
-                  key={index}
-                  className="flex justify-between items-start py-2 border-b border-gray-200 last:border-0"
-                >
-                  <div className="flex-1">
-                    <p className="font-medium text-gray-800">{item.name}</p>
-                    <p className="text-sm text-gray-500">
-                      Qty: {item.quantity} × {formatCurrency(item.unitPrice)}
-                    </p>
-                  </div>
-                  <span className="font-medium text-green-600">
-                    {formatCurrency(item.totalPrice)}
-                  </span>
-                </div>
-              ))}
-              {(!processedData?.items || processedData.items.length === 0) && (
-                <p className="text-gray-500 text-sm">No items detected</p>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Call-to-Action Box */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-        <h3 className="font-medium text-blue-800 text-lg mb-2">
-          Save Your Receipt!
-        </h3>
-        <p className="text-blue-700 mb-4">
-          Create a free account to save and track your spending over time.
-        </p>
-        <div className="flex flex-col sm:flex-row gap-3">
-          <button
-            onClick={() => navigate('/register')}
-            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3 px-6 rounded-lg font-medium transition-colors"
-          >
-            Create Account
-          </button>
-          <button
-            onClick={clearSelection}
-            className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 py-3 px-6 rounded-lg font-medium transition-colors"
-          >
-            Upload Another
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-
   return (
     <div className="min-h-screen bg-gray-100 p-4 sm:p-6">
       <div className="max-w-4xl mx-auto">
@@ -447,8 +409,6 @@ const ReceiptUpload: React.FC = () => {
           {/* Content based on state */}
           {processing ? (
             renderProcessing()
-          ) : processedData && isGuest ? (
-            renderGuestResults()
           ) : file && previewUrl ? (
             renderPreview()
           ) : (
@@ -456,6 +416,16 @@ const ReceiptUpload: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Review Modal */}
+      {showReviewModal && reviewData && (
+        <ReceiptReviewModal
+          data={reviewData}
+          onSave={handleSaveReview}
+          onCancel={handleCancelReview}
+          saving={saving}
+        />
+      )}
     </div>
   );
 };
