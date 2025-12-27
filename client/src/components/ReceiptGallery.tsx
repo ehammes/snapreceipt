@@ -407,14 +407,14 @@ const ReceiptGallery: React.FC = () => {
               <button
                 onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
                 className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                title={sortOrder === 'asc' ? 'Ascending' : 'Descending'}
+                aria-label={sortOrder === 'asc' ? 'Sort ascending, click for descending' : 'Sort descending, click for ascending'}
               >
                 {sortOrder === 'asc' ? (
-                  <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
                   </svg>
                 ) : (
-                  <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h9m5-4v12m0 0l-4-4m4 4l4-4" />
                   </svg>
                 )}
@@ -454,6 +454,7 @@ const ReceiptGallery: React.FC = () => {
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
+                  aria-hidden="true"
                 >
                   <path
                     strokeLinecap="round"
@@ -469,6 +470,7 @@ const ReceiptGallery: React.FC = () => {
                 value={filters.search}
                 onChange={(e) => handleFilterChange('search', e.target.value)}
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                aria-label="Search receipts"
               />
             </div>
 
@@ -480,12 +482,16 @@ const ReceiptGallery: React.FC = () => {
                   ? 'bg-blue-600 text-white hover:bg-blue-700'
                   : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
               }`}
+              aria-expanded={showFilters}
+              aria-controls="filter-panel"
+              aria-label={`Filters${activeFilterCount > 0 ? `, ${activeFilterCount} active` : ''}`}
             >
               <svg
                 className="w-5 h-5"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
+                aria-hidden="true"
               >
                 <path
                   strokeLinecap="round"
@@ -496,7 +502,7 @@ const ReceiptGallery: React.FC = () => {
               </svg>
               Filters
               {activeFilterCount > 0 && (
-                <span className="bg-white text-blue-600 text-xs font-bold px-2 py-0.5 rounded-full">
+                <span className="bg-white text-blue-600 text-xs font-bold px-2 py-0.5 rounded-full" aria-hidden="true">
                   {activeFilterCount}
                 </span>
               )}
@@ -505,7 +511,7 @@ const ReceiptGallery: React.FC = () => {
 
           {/* Advanced Filters Panel */}
           {showFilters && (
-            <div className="mt-4 pt-4 border-t border-gray-200">
+            <div id="filter-panel" className="mt-4 pt-4 border-t border-gray-200" role="region" aria-label="Filter options">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {/* Start Date */}
                 <div>
@@ -659,24 +665,29 @@ const ReceiptGallery: React.FC = () => {
 
         {/* Receipts Grid */}
         {sortedReceipts.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" role="list" aria-label="Receipts">
             {sortedReceipts.map((receipt) => (
-              <div
+              <article
                 key={receipt.id}
                 onClick={() => navigate(`/receipts/${receipt.id}`)}
                 className="bg-white rounded-lg shadow cursor-pointer hover:shadow-xl transition-shadow duration-200 overflow-hidden relative group"
+                role="listitem"
+                aria-label={`Receipt from ${receipt.store_name || 'Store'}, ${formatCurrency(receipt.total_amount)}, ${formatDate(receipt.purchase_date)}`}
+                tabIndex={0}
+                onKeyDown={(e) => e.key === 'Enter' && navigate(`/receipts/${receipt.id}`)}
               >
                 {/* Delete Button */}
                 <button
                   onClick={(e) => handleDeleteClick(e, receipt)}
-                  className="absolute top-2 right-2 z-10 w-8 h-8 rounded-full bg-red-100 hover:bg-red-200 flex items-center justify-center shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
-                  title="Delete receipt"
+                  className="absolute top-2 right-2 z-10 w-8 h-8 rounded-full bg-red-100 hover:bg-red-200 flex items-center justify-center shadow-sm opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
+                  aria-label={`Delete receipt from ${receipt.store_name || 'Store'}`}
                 >
                   <svg
                     className="w-4 h-4 text-red-600"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
+                    aria-hidden="true"
                   >
                     <path
                       strokeLinecap="round"
@@ -736,7 +747,7 @@ const ReceiptGallery: React.FC = () => {
                     </span>
                   </div>
                 </div>
-              </div>
+              </article>
             ))}
           </div>
         )}
@@ -750,7 +761,7 @@ const ReceiptGallery: React.FC = () => {
 
         {/* Delete Confirmation Modal */}
         {deleteModalOpen && receiptToDelete && (
-          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="delete-modal-title">
             <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
               {/* Warning Icon */}
               <svg
@@ -758,6 +769,7 @@ const ReceiptGallery: React.FC = () => {
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
+                aria-hidden="true"
               >
                 <path
                   strokeLinecap="round"
@@ -768,7 +780,7 @@ const ReceiptGallery: React.FC = () => {
               </svg>
 
               {/* Modal Content */}
-              <h2 className="text-xl font-bold text-gray-800 text-center mb-2">
+              <h2 id="delete-modal-title" className="text-xl font-bold text-gray-800 text-center mb-2">
                 Delete Receipt?
               </h2>
               <p className="text-gray-600 text-center mb-4">

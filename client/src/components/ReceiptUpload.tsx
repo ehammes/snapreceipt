@@ -302,6 +302,10 @@ const ReceiptUpload: React.FC = () => {
             ? 'border-blue-500 bg-blue-50'
             : 'border-gray-300 hover:border-blue-400 hover:bg-gray-50'
         }`}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => e.key === 'Enter' && fileInputRef.current?.click()}
+        aria-label="Drop zone for receipt images, click or press Enter to browse files"
       >
         <div className="flex flex-col items-center">
           <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 ${
@@ -312,6 +316,7 @@ const ReceiptUpload: React.FC = () => {
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
+              aria-hidden="true"
             >
               <path
                 strokeLinecap="round"
@@ -337,6 +342,7 @@ const ReceiptUpload: React.FC = () => {
         accept="image/*"
         onChange={handleFileChange}
         className="hidden"
+        aria-label="Select receipt image file"
       />
 
       {/* Divider */}

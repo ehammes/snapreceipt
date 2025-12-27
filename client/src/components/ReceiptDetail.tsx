@@ -595,7 +595,7 @@ const ReceiptDetail: React.FC = () => {
                 <>
                   <img
                     src={`${API_BASE_URL}${receipt.image_url}`}
-                    alt="Receipt"
+                    alt={`Receipt from ${receipt.store_name || 'Store'} dated ${new Date(receipt.purchase_date).toLocaleDateString()}`}
                     className="w-full rounded-lg cursor-zoom-in"
                     onClick={() => setImageZoomed(true)}
                   />
@@ -1104,10 +1104,13 @@ const ReceiptDetail: React.FC = () => {
         <div
           className="fixed inset-0 z-50 bg-black bg-opacity-90 flex items-center justify-center p-4 cursor-zoom-out"
           onClick={() => setImageZoomed(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Zoomed receipt image"
         >
           <img
             src={`${API_BASE_URL}${receipt.image_url}`}
-            alt="Receipt (zoomed)"
+            alt={`Zoomed receipt from ${receipt.store_name || 'Store'}`}
             className="max-w-full max-h-full object-contain"
           />
           <button
@@ -1133,7 +1136,7 @@ const ReceiptDetail: React.FC = () => {
 
       {/* Delete Confirmation Modal */}
       {deleteModalOpen && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="delete-receipt-title">
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
             {/* Warning Icon */}
             <svg
@@ -1141,6 +1144,7 @@ const ReceiptDetail: React.FC = () => {
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
+              aria-hidden="true"
             >
               <path
                 strokeLinecap="round"
@@ -1151,7 +1155,7 @@ const ReceiptDetail: React.FC = () => {
             </svg>
 
             {/* Modal Content */}
-            <h2 className="text-xl font-bold text-gray-800 text-center mb-2">
+            <h2 id="delete-receipt-title" className="text-xl font-bold text-gray-800 text-center mb-2">
               Delete Receipt?
             </h2>
             <p className="text-gray-600 text-center mb-4">
@@ -1226,7 +1230,7 @@ const ReceiptDetail: React.FC = () => {
 
       {/* Delete Item Confirmation Modal */}
       {deleteItemModalOpen && itemToDelete && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="delete-item-title">
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
             {/* Warning Icon */}
             <svg
@@ -1234,6 +1238,7 @@ const ReceiptDetail: React.FC = () => {
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
+              aria-hidden="true"
             >
               <path
                 strokeLinecap="round"
@@ -1244,7 +1249,7 @@ const ReceiptDetail: React.FC = () => {
             </svg>
 
             {/* Modal Content */}
-            <h2 className="text-xl font-bold text-gray-800 text-center mb-2">
+            <h2 id="delete-item-title" className="text-xl font-bold text-gray-800 text-center mb-2">
               Delete Item?
             </h2>
             <p className="text-gray-600 text-center mb-4">

@@ -32,11 +32,11 @@ const Navigation: React.FC = () => {
   ];
 
   return (
-    <nav className="bg-white shadow-md sticky top-0 z-40">
+    <nav className="bg-white shadow-md sticky top-0 z-40" aria-label="Main navigation">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-2">
+          <Link to="/" className="flex items-center gap-2" aria-label="SnapReceipt Home">
             <div className="relative w-9 h-9">
               {/* Camera viewfinder corners */}
               <svg
@@ -44,6 +44,7 @@ const Navigation: React.FC = () => {
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 36 36"
+                aria-hidden="true"
               >
                 {/* Top-left corner */}
                 <path strokeLinecap="round" strokeWidth={2.5} d="M4 12V6a2 2 0 012-2h6" />
@@ -60,6 +61,7 @@ const Navigation: React.FC = () => {
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 36 36"
+                aria-hidden="true"
               >
                 <path
                   strokeLinecap="round"
@@ -86,6 +88,7 @@ const Navigation: React.FC = () => {
                     ? 'bg-blue-100 text-blue-700'
                     : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
                 }`}
+                aria-current={isActive(link.path) ? 'page' : undefined}
               >
                 {link.label}
               </Link>
@@ -127,6 +130,9 @@ const Navigation: React.FC = () => {
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             className="md:hidden p-2 rounded-lg text-gray-600 hover:bg-gray-100"
+            aria-expanded={mobileMenuOpen}
+            aria-controls="mobile-menu"
+            aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
           >
             {mobileMenuOpen ? (
               <svg
@@ -134,6 +140,7 @@ const Navigation: React.FC = () => {
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
+                aria-hidden="true"
               >
                 <path
                   strokeLinecap="round"
@@ -148,6 +155,7 @@ const Navigation: React.FC = () => {
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
+                aria-hidden="true"
               >
                 <path
                   strokeLinecap="round"
@@ -162,7 +170,7 @@ const Navigation: React.FC = () => {
 
         {/* Mobile Navigation */}
         {mobileMenuOpen && (
-          <div className="md:hidden pb-4">
+          <div id="mobile-menu" className="md:hidden pb-4" role="navigation" aria-label="Mobile navigation">
             <div className="flex flex-col gap-1">
               {navLinks.map((link) => (
                 <Link
@@ -174,6 +182,7 @@ const Navigation: React.FC = () => {
                       ? 'bg-blue-100 text-blue-700'
                       : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
                   }`}
+                  aria-current={isActive(link.path) ? 'page' : undefined}
                 >
                   {link.label}
                 </Link>
