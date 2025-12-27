@@ -113,6 +113,11 @@ const AnalyticsDashboard: React.FC = () => {
   const [sortBy, setSortBy] = useState<SortKey>('quantity');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
 
+  // Expanded row state
+  const [expandedRow, setExpandedRow] = useState<string | null>(null);
+  const [priceHistory, setPriceHistory] = useState<Record<string, Array<{ date: string; price: number }>>>({});
+  const [loadingHistory, setLoadingHistory] = useState<string | null>(null);
+
   // Sorted items
   const sortedItems = useMemo(() => {
     return [...topItems].sort((a, b) => {
@@ -139,6 +144,69 @@ const AnalyticsDashboard: React.FC = () => {
     } else {
       setSortBy(column);
       setSortOrder('desc');
+    }
+  };
+
+  // Fetch price history for an item
+  const fetchPriceHistory = async (itemName: string, itemNumber: string) => {
+    const rowKey = `${itemName}-${itemNumber}`;
+
+    // If we already have the history, don't fetch again
+    if (priceHistory[rowKey]) return;
+
+    setLoadingHistory(rowKey);
+
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+
+      const response = await fetch('http://localhost:3001/api/receipts', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!response.ok) return;
+
+      const data = await response.json();
+      const receipts: Receipt[] = data.receipts || [];
+
+      // Extract price history for this item from all receipts
+      const history: Array<{ date: string; price: number }> = [];
+
+      receipts.forEach((receipt) => {
+        (receipt.items || []).forEach((item) => {
+          // Match by item name (case insensitive) or item number
+          const nameMatch = item.name.toLowerCase() === itemName.toLowerCase();
+          const numberMatch = itemNumber && item.id && item.id === itemNumber;
+
+          if (nameMatch || numberMatch) {
+            history.push({
+              date: receipt.purchase_date,
+              price: Number(item.unit_price) || Number(item.total_price) / (item.quantity || 1),
+            });
+          }
+        });
+      });
+
+      // Sort by date (most recent first)
+      history.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+      setPriceHistory((prev) => ({ ...prev, [rowKey]: history }));
+    } catch (err) {
+      console.error('Error fetching price history:', err);
+    } finally {
+      setLoadingHistory(null);
+    }
+  };
+
+  // Handle row expansion
+  const handleRowExpand = (itemName: string, itemNumber: string) => {
+    const rowKey = `${itemName}-${itemNumber}`;
+
+    if (expandedRow === rowKey) {
+      setExpandedRow(null);
+    } else {
+      setExpandedRow(rowKey);
+      fetchPriceHistory(itemName, itemNumber);
     }
   };
 
@@ -617,51 +685,134 @@ const AnalyticsDashboard: React.FC = () => {
           {/* Mobile Card View */}
           <div className="md:hidden space-y-3">
             {sortedItems.length > 0 ? (
-              sortedItems.map((item, index) => (
-                <div
-                  key={index}
-                  className="bg-gray-50 p-4 rounded-lg border border-gray-200"
-                >
-                  <div className="flex justify-between items-start mb-2">
-                    <div>
-                      <h3 className="font-medium text-gray-900">{item.name}</h3>
-                      {item.itemNumber && (
-                        <span className="text-xs text-gray-400">#{item.itemNumber}</span>
-                      )}
+              sortedItems.map((item, index) => {
+                const rowKey = `${item.name}-${item.itemNumber}`;
+                const isExpanded = expandedRow === rowKey;
+                const avgPrice = item.quantity > 0 ? item.totalSpent / item.quantity : 0;
+
+                return (
+                  <div
+                    key={index}
+                    className="bg-gray-50 rounded-lg border border-gray-200 overflow-hidden"
+                  >
+                    <div
+                      onClick={() => handleRowExpand(item.name, item.itemNumber)}
+                      className="p-4 cursor-pointer"
+                    >
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="flex items-center gap-2">
+                          <svg
+                            className={`w-4 h-4 text-gray-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                          <div>
+                            <h3 className="font-medium text-gray-900">{item.name}</h3>
+                            {item.itemNumber && (
+                              <span className="text-xs text-gray-400">#{item.itemNumber}</span>
+                            )}
+                          </div>
+                        </div>
+                        <span className="text-sm font-semibold text-green-600">
+                          ${Number(item.totalSpent).toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 mb-3 ml-6">
+                        <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${CATEGORY_COLORS[item.category] || CATEGORY_COLORS['Uncategorized']}`}>
+                          {item.category}
+                        </span>
+                        {item.priceChange !== 0 && (
+                          <span className={`flex items-center gap-0.5 text-xs font-medium ${item.priceChange > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                            {item.priceChange > 0 ? '↑' : '↓'}
+                            {Math.abs(item.priceChange).toFixed(1)}%
+                          </span>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-sm text-gray-500 ml-6">
+                        <div>
+                          <span className="block text-xs text-gray-400">Quantity</span>
+                          <span className="font-semibold text-gray-900">
+                            {item.quantity}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="block text-xs text-gray-400">Purchases</span>
+                          <span>{item.purchaseCount}</span>
+                        </div>
+                        <div>
+                          <span className="block text-xs text-gray-400">Last Bought</span>
+                          <span className="text-xs">{formatDate(item.lastPurchased)}</span>
+                        </div>
+                      </div>
                     </div>
-                    <span className="text-sm font-semibold text-green-600">
-                      ${item.totalSpent.toFixed(2)}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${CATEGORY_COLORS[item.category] || CATEGORY_COLORS['Uncategorized']}`}>
-                      {item.category}
-                    </span>
-                    {item.priceChange !== 0 && (
-                      <span className={`flex items-center gap-0.5 text-xs font-medium ${item.priceChange > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                        {item.priceChange > 0 ? '↑' : '↓'}
-                        {Math.abs(item.priceChange).toFixed(1)}%
-                      </span>
+
+                    {/* Expanded Details */}
+                    {isExpanded && (
+                      <div className="px-4 pb-4 pt-2 border-t border-gray-200 bg-white">
+                        <div className="grid grid-cols-2 gap-3 mb-3">
+                          <div className="bg-gray-50 p-3 rounded-lg">
+                            <p className="text-xs text-gray-500 mb-1">Average Price</p>
+                            <p className="text-sm font-semibold text-gray-900">
+                              ${avgPrice.toFixed(2)}
+                            </p>
+                          </div>
+                          <div className="bg-gray-50 p-3 rounded-lg">
+                            <p className="text-xs text-gray-500 mb-1">Price Trend</p>
+                            {item.priceChange !== 0 ? (
+                              <p className={`text-sm font-semibold ${item.priceChange > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                {item.priceChange > 0 ? '↑' : '↓'} {Math.abs(item.priceChange).toFixed(1)}%
+                              </p>
+                            ) : (
+                              <p className="text-sm font-semibold text-gray-500">No change</p>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Purchase History */}
+                        <div className="mt-3">
+                          <p className="text-xs font-medium text-gray-500 mb-2">Purchase History</p>
+                          {loadingHistory === rowKey ? (
+                            <div className="flex items-center justify-center py-3 text-gray-400 text-xs">
+                              <svg className="w-4 h-4 animate-spin mr-2" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                              </svg>
+                              Loading...
+                            </div>
+                          ) : priceHistory[rowKey] && priceHistory[rowKey].length > 0 ? (
+                            <div className="space-y-2">
+                              {priceHistory[rowKey].map((entry, idx, arr) => {
+                                // Compare to next entry (older purchase) since sorted most recent first
+                                const olderPrice = idx < arr.length - 1 ? arr[idx + 1].price : null;
+                                const change = olderPrice ? ((entry.price - olderPrice) / olderPrice) * 100 : null;
+
+                                return (
+                                  <div key={idx} className="flex items-center justify-between py-2 px-3 bg-gray-50 rounded-lg">
+                                    <span className="text-xs text-gray-600">{formatDate(entry.date)}</span>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-sm font-medium text-gray-900">${entry.price.toFixed(2)}</span>
+                                      {change !== null && (
+                                        <span className={`text-xs font-medium ${change > 0 ? 'text-red-600' : change < 0 ? 'text-green-600' : 'text-gray-400'}`}>
+                                          {change > 0 ? '+' : ''}{change.toFixed(1)}%
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <p className="text-xs text-gray-400 text-center py-3">No history found</p>
+                          )}
+                        </div>
+                      </div>
                     )}
                   </div>
-                  <div className="grid grid-cols-3 gap-2 text-sm text-gray-500">
-                    <div>
-                      <span className="block text-xs text-gray-400">Quantity</span>
-                      <span className="font-semibold text-gray-900">
-                        {item.quantity}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="block text-xs text-gray-400">Purchases</span>
-                      <span>{item.purchaseCount}</span>
-                    </div>
-                    <div>
-                      <span className="block text-xs text-gray-400">Last Bought</span>
-                      <span className="text-xs">{formatDate(item.lastPurchased)}</span>
-                    </div>
-                  </div>
-                </div>
-              ))
+                );
+              })
             ) : (
               <div className="text-center py-8 text-gray-500">
                 <p className="text-lg mb-2">No items yet</p>
@@ -729,56 +880,176 @@ const AnalyticsDashboard: React.FC = () => {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {sortedItems.length > 0 ? (
-                  sortedItems.map((item, index) => (
-                    <tr
-                      key={index}
-                      className="hover:bg-gray-50 transition-colors"
-                    >
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">
-                          {item.name}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-semibold text-gray-900">
-                          {item.quantity}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-semibold text-green-600">
-                          ${item.totalSpent.toFixed(2)}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${CATEGORY_COLORS[item.category] || CATEGORY_COLORS['Uncategorized']}`}>
-                          {item.category}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-500">
-                          {formatDate(item.lastPurchased)}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {item.priceChange !== 0 ? (
-                          <div className={`flex items-center gap-1 text-sm font-medium ${item.priceChange > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                            {item.priceChange > 0 ? (
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                  sortedItems.map((item, index) => {
+                    const rowKey = `${item.name}-${item.itemNumber}`;
+                    const isExpanded = expandedRow === rowKey;
+                    const avgPrice = item.quantity > 0 ? item.totalSpent / item.quantity : 0;
+
+                    return (
+                      <React.Fragment key={index}>
+                        <tr
+                          onClick={() => handleRowExpand(item.name, item.itemNumber)}
+                          className="hover:bg-gray-50 transition-colors cursor-pointer"
+                        >
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center gap-2">
+                              <svg
+                                className={`w-4 h-4 text-gray-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                               </svg>
+                              <div className="text-sm font-medium text-gray-900">
+                                {item.name}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-semibold text-gray-900">
+                              {item.quantity}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-semibold text-green-600">
+                              ${Number(item.totalSpent).toFixed(2)}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${CATEGORY_COLORS[item.category] || CATEGORY_COLORS['Uncategorized']}`}>
+                              {item.category}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-500">
+                              {formatDate(item.lastPurchased)}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            {item.priceChange !== 0 ? (
+                              <div className={`flex items-center gap-1 text-sm font-medium ${item.priceChange > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                {item.priceChange > 0 ? (
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                                  </svg>
+                                ) : (
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                  </svg>
+                                )}
+                                {Math.abs(item.priceChange).toFixed(1)}%
+                              </div>
                             ) : (
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                              </svg>
+                              <div className="text-sm text-gray-400">—</div>
                             )}
-                            {Math.abs(item.priceChange).toFixed(1)}%
-                          </div>
-                        ) : (
-                          <div className="text-sm text-gray-400">—</div>
+                          </td>
+                        </tr>
+
+                        {/* Expanded Details Row */}
+                        {isExpanded && (
+                          <tr className="bg-gray-50">
+                            <td colSpan={6} className="px-6 py-4">
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                {/* Item Number */}
+                                <div className="bg-white p-4 rounded-lg border border-gray-200">
+                                  <p className="text-xs text-gray-500 mb-1">Item Number</p>
+                                  <p className="text-sm font-semibold text-gray-900">
+                                    {item.itemNumber || 'N/A'}
+                                  </p>
+                                </div>
+
+                                {/* Purchase Count */}
+                                <div className="bg-white p-4 rounded-lg border border-gray-200">
+                                  <p className="text-xs text-gray-500 mb-1">Times Purchased</p>
+                                  <p className="text-sm font-semibold text-gray-900">
+                                    {item.purchaseCount} {item.purchaseCount === 1 ? 'time' : 'times'}
+                                  </p>
+                                </div>
+
+                                {/* Average Price */}
+                                <div className="bg-white p-4 rounded-lg border border-gray-200">
+                                  <p className="text-xs text-gray-500 mb-1">Average Price</p>
+                                  <p className="text-sm font-semibold text-gray-900">
+                                    ${avgPrice.toFixed(2)}
+                                  </p>
+                                </div>
+
+                                {/* Price Trend Info */}
+                                <div className="bg-white p-4 rounded-lg border border-gray-200">
+                                  <p className="text-xs text-gray-500 mb-1">Price Trend</p>
+                                  {item.priceChange !== 0 ? (
+                                    <p className={`text-sm font-semibold ${item.priceChange > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                      {item.priceChange > 0 ? '↑' : '↓'} {Math.abs(item.priceChange).toFixed(1)}% since first purchase
+                                    </p>
+                                  ) : (
+                                    <p className="text-sm font-semibold text-gray-500">
+                                      No change
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Price History */}
+                              <div className="mt-4 p-4 bg-white rounded-lg border border-gray-200">
+                                <p className="text-sm font-medium text-gray-700 mb-3">Purchase History</p>
+                                {loadingHistory === rowKey ? (
+                                  <div className="flex items-center justify-center py-4 text-gray-400">
+                                    <svg className="w-5 h-5 animate-spin mr-2" fill="none" viewBox="0 0 24 24">
+                                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                    </svg>
+                                    Loading...
+                                  </div>
+                                ) : priceHistory[rowKey] && priceHistory[rowKey].length > 0 ? (
+                                  <div className="overflow-x-auto">
+                                    <table className="w-full text-sm">
+                                      <thead>
+                                        <tr className="border-b border-gray-200">
+                                          <th className="text-left py-2 px-3 text-xs font-medium text-gray-500 uppercase">Date</th>
+                                          <th className="text-right py-2 px-3 text-xs font-medium text-gray-500 uppercase">Price</th>
+                                          <th className="text-right py-2 px-3 text-xs font-medium text-gray-500 uppercase">Change</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {priceHistory[rowKey].map((entry, idx, arr) => {
+                                          // Compare to next entry (older purchase) since sorted most recent first
+                                          const olderPrice = idx < arr.length - 1 ? arr[idx + 1].price : null;
+                                          const change = olderPrice ? ((entry.price - olderPrice) / olderPrice) * 100 : null;
+
+                                          return (
+                                            <tr key={idx} className="border-b border-gray-100 last:border-0">
+                                              <td className="py-2 px-3 text-gray-600">
+                                                {formatDate(entry.date)}
+                                              </td>
+                                              <td className="py-2 px-3 text-right font-medium text-gray-900">
+                                                ${entry.price.toFixed(2)}
+                                              </td>
+                                              <td className="py-2 px-3 text-right">
+                                                {change !== null ? (
+                                                  <span className={`text-xs font-medium ${change > 0 ? 'text-red-600' : change < 0 ? 'text-green-600' : 'text-gray-400'}`}>
+                                                    {change > 0 ? '+' : ''}{change.toFixed(1)}%
+                                                  </span>
+                                                ) : (
+                                                  <span className="text-xs text-gray-400">—</span>
+                                                )}
+                                              </td>
+                                            </tr>
+                                          );
+                                        })}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                ) : (
+                                  <p className="text-sm text-gray-400 text-center py-4">No purchase history found</p>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
                         )}
-                      </td>
-                    </tr>
-                  ))
+                      </React.Fragment>
+                    );
+                  })
                 ) : (
                   <tr>
                     <td colSpan={6} className="px-6 py-12 text-center">
