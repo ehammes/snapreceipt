@@ -24,7 +24,6 @@ const Navigation: React.FC = () => {
   };
 
   const navLinks = [
-    { path: '/', label: 'Home' },
     { path: '/upload', label: 'Upload' },
     { path: '/receipts', label: 'Receipts' },
     { path: '/dashboard', label: 'Analytics' },
