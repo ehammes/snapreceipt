@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation, Link } from 'react-router-dom';
 import Navigation from './components/Navigation';
+import Footer from './components/Footer';
 import ReceiptUpload from './components/ReceiptUpload';
 import ReceiptGallery from './components/ReceiptGallery';
 import ReceiptDetail from './components/ReceiptDetail';
@@ -437,24 +438,27 @@ const Home = () => {
   );
 };
 
-// Layout wrapper to conditionally show navigation
+// Layout wrapper to conditionally show navigation and footer
 const AppLayout = () => {
   const location = useLocation();
-  const hideNavRoutes = ['/register', '/login'];
-  const showNav = !hideNavRoutes.includes(location.pathname);
+  const hideNavFooterRoutes = ['/register', '/login'];
+  const showNavFooter = !hideNavFooterRoutes.includes(location.pathname);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {showNav && <Navigation />}
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/upload" element={<ReceiptUpload />} />
-        <Route path="/dashboard" element={<AnalyticsDashboard />} />
-        <Route path="/receipts" element={<ReceiptGallery />} />
-        <Route path="/receipts/:id" element={<ReceiptDetail />} />
-      </Routes>
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      {showNavFooter && <Navigation />}
+      <main className="flex-1">
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/upload" element={<ReceiptUpload />} />
+          <Route path="/dashboard" element={<AnalyticsDashboard />} />
+          <Route path="/receipts" element={<ReceiptGallery />} />
+          <Route path="/receipts/:id" element={<ReceiptDetail />} />
+        </Routes>
+      </main>
+      {showNavFooter && <Footer />}
     </div>
   );
 };
