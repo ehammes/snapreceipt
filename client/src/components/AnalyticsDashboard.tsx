@@ -472,97 +472,82 @@ const AnalyticsDashboard: React.FC = () => {
         {/* Summary Stats Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 mb-6">
           {/* Total Spent Card */}
-          <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-6 rounded-xl shadow-lg relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10" />
-            <div className="relative">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-medium text-blue-100">Total Spent</h3>
-                <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
-                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
+          <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-blue-500">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center">
+                <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
               </div>
-              <p className="text-3xl font-bold text-white">
-                ${summaryMetrics.totalSpent.toFixed(2)}
-              </p>
+              <p className="text-sm font-medium text-gray-500">Total Spent</p>
             </div>
+            <p className="text-2xl font-bold text-gray-900">
+              ${summaryMetrics.totalSpent.toFixed(2)}
+            </p>
           </div>
 
           {/* Total Items Card */}
-          <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 p-6 rounded-xl shadow-lg relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10" />
-            <div className="relative">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-medium text-emerald-100">Total Items</h3>
-                <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
-                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                  </svg>
-                </div>
+          <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-blue-400">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center">
+                <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                </svg>
               </div>
-              <p className="text-3xl font-bold text-white">
-                {summaryMetrics.totalItems}
-              </p>
-              <p className="text-xs text-emerald-100 mt-1">items purchased</p>
+              <p className="text-sm font-medium text-gray-500">Total Items</p>
             </div>
+            <p className="text-2xl font-bold text-gray-900">
+              {summaryMetrics.totalItems}
+            </p>
+            <p className="text-xs text-gray-400 mt-1">items purchased</p>
           </div>
 
           {/* Unique Items Card */}
-          <div className="bg-gradient-to-br from-purple-500 to-purple-600 p-6 rounded-xl shadow-lg relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10" />
-            <div className="relative">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-medium text-purple-100">Unique Items</h3>
-                <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
-                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-                  </svg>
-                </div>
+          <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-indigo-400">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 bg-indigo-50 rounded-lg flex items-center justify-center">
+                <svg className="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                </svg>
               </div>
-              <p className="text-3xl font-bold text-white">
-                {summaryMetrics.uniqueItems}
-              </p>
-              <p className="text-xs text-purple-100 mt-1">different products</p>
+              <p className="text-sm font-medium text-gray-500">Unique Items</p>
             </div>
+            <p className="text-2xl font-bold text-gray-900">
+              {summaryMetrics.uniqueItems}
+            </p>
+            <p className="text-xs text-gray-400 mt-1">different products</p>
           </div>
 
           {/* Total Receipts Card */}
-          <div className="bg-gradient-to-br from-amber-500 to-orange-500 p-6 rounded-xl shadow-lg relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10" />
-            <div className="relative">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-medium text-amber-100">Total Receipts</h3>
-                <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
-                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                </div>
+          <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-sky-400">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 bg-sky-50 rounded-lg flex items-center justify-center">
+                <svg className="w-5 h-5 text-sky-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
               </div>
-              <p className="text-3xl font-bold text-white">
-                {summaryMetrics.totalReceipts}
-              </p>
-              <p className="text-xs text-amber-100 mt-1">shopping trips</p>
+              <p className="text-sm font-medium text-gray-500">Total Receipts</p>
             </div>
+            <p className="text-2xl font-bold text-gray-900">
+              {summaryMetrics.totalReceipts}
+            </p>
+            <p className="text-xs text-gray-400 mt-1">shopping trips</p>
           </div>
 
           {/* Average Per Receipt Card */}
-          <div className="bg-gradient-to-br from-cyan-500 to-teal-500 p-6 rounded-xl shadow-lg relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10" />
-            <div className="relative">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-medium text-cyan-100">Avg Per Trip</h3>
-                <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
-                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                  </svg>
-                </div>
+          <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-violet-400">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 bg-violet-50 rounded-lg flex items-center justify-center">
+                <svg className="w-5 h-5 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
               </div>
-              <p className="text-3xl font-bold text-white">
-                ${summaryMetrics.averagePerReceipt.toFixed(2)}
-              </p>
-              <p className="text-xs text-cyan-100 mt-1">per shopping trip</p>
+              <p className="text-sm font-medium text-gray-500">Avg Per Trip</p>
             </div>
+            <p className="text-2xl font-bold text-gray-900">
+              ${summaryMetrics.averagePerReceipt.toFixed(2)}
+            </p>
+            <p className="text-xs text-gray-400 mt-1">per shopping trip</p>
           </div>
         </div>
 
