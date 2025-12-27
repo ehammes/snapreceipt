@@ -31,7 +31,8 @@ const Home = () => {
   const [loading, setLoading] = useState(true);
   const [fetchSuccess, setFetchSuccess] = useState(false);
 
-  useEffect(() => {
+  // Check auth state and fetch stats
+  const checkAuthAndFetchStats = () => {
     const token = localStorage.getItem('token');
     setIsLoggedIn(!!token);
 
@@ -39,7 +40,34 @@ const Home = () => {
       fetchStats(token);
     } else {
       setLoading(false);
+      setStats(null);
+      setFetchSuccess(false);
     }
+  };
+
+  useEffect(() => {
+    checkAuthAndFetchStats();
+
+    // Listen for storage changes (logout from another tab)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'token') {
+        checkAuthAndFetchStats();
+      }
+    };
+
+    // Listen for custom auth change event (logout from same tab)
+    const handleAuthChange = () => {
+      checkAuthAndFetchStats();
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('authChange', handleAuthChange);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('authChange', handleAuthChange);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchStats = async (token: string) => {

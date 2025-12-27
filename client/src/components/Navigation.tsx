@@ -20,6 +20,8 @@ const Navigation: React.FC = () => {
     sessionStorage.removeItem('guestReceipt');
     setIsAuthenticated(false);
     setMobileMenuOpen(false);
+    // Dispatch custom event to notify other components of auth change
+    window.dispatchEvent(new Event('authChange'));
     navigate('/');
   };
 
