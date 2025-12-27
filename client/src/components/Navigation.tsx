@@ -36,19 +36,39 @@ const Navigation: React.FC = () => {
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2">
-            <svg
-              className="w-8 h-8 text-blue-600"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-              />
-            </svg>
+            <div className="relative w-9 h-9">
+              {/* Camera viewfinder corners */}
+              <svg
+                className="absolute inset-0 w-9 h-9 text-blue-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 36 36"
+              >
+                {/* Top-left corner */}
+                <path strokeLinecap="round" strokeWidth={2.5} d="M4 12V6a2 2 0 012-2h6" />
+                {/* Top-right corner */}
+                <path strokeLinecap="round" strokeWidth={2.5} d="M24 4h6a2 2 0 012 2v6" />
+                {/* Bottom-left corner */}
+                <path strokeLinecap="round" strokeWidth={2.5} d="M4 24v6a2 2 0 002 2h6" />
+                {/* Bottom-right corner */}
+                <path strokeLinecap="round" strokeWidth={2.5} d="M32 24v6a2 2 0 01-2 2h-6" />
+              </svg>
+              {/* Receipt icon in center */}
+              <svg
+                className="absolute inset-0 w-9 h-9 text-blue-500"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 36 36"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M12 9h12v18l-3-2-3 2-3-2-3 2V9z"
+                />
+                <path strokeLinecap="round" strokeWidth={1.5} d="M14 14h8M14 18h6" />
+              </svg>
+            </div>
             <span className="font-bold text-xl text-gray-800">
               SnapReceipt
             </span>
