@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import ReceiptReviewModal, { ReviewData } from './ReceiptReviewModal';
 
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+
 interface ProcessedItem {
   id?: string;
   name: string;
@@ -128,7 +130,7 @@ const ReceiptUpload: React.FC = () => {
       }
 
       // Upload for processing only (don't save yet)
-      const response = await fetch('http://localhost:3001/api/receipts/upload', {
+      const response = await fetch(`${API_BASE_URL}/api/receipts/upload`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -202,7 +204,7 @@ const ReceiptUpload: React.FC = () => {
 
       if (receiptId) {
         // Update existing receipt with edited data
-        const response = await fetch(`http://localhost:3001/api/receipts/${receiptId}`, {
+        const response = await fetch(`${API_BASE_URL}/api/receipts/${receiptId}`, {
           method: 'PATCH',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -227,7 +229,7 @@ const ReceiptUpload: React.FC = () => {
         for (const item of data.items) {
           // Only update items that have a server ID (not newly added items with client IDs)
           if (item.id && !item.id.startsWith('new-') && !item.id.startsWith('item-')) {
-            await fetch(`http://localhost:3001/api/receipts/${receiptId}/items/${item.id}`, {
+            await fetch(`${API_BASE_URL}/api/receipts/${receiptId}/items/${item.id}`, {
               method: 'PUT',
               headers: {
                 'Authorization': `Bearer ${token}`,

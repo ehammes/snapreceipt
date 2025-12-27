@@ -37,7 +37,7 @@ const Register: React.FC = () => {
 
     try {
       // Register the user
-      const registerRes = await fetch('http://localhost:3001/api/auth/register', {
+      const registerRes = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3001'}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),

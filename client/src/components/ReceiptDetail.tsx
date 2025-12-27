@@ -2,6 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { CATEGORIES } from '../constants/categories';
 
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+
 interface ReceiptItem {
   id: string;
   name: string;
@@ -110,7 +112,7 @@ const ReceiptDetail: React.FC = () => {
         return;
       }
 
-      const response = await fetch(`http://localhost:3001/api/receipts/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/receipts/${id}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -156,7 +158,7 @@ const ReceiptDetail: React.FC = () => {
     setSaving(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:3001/api/receipts/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/receipts/${id}`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -186,7 +188,7 @@ const ReceiptDetail: React.FC = () => {
     setSaving(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:3001/api/receipts/${id}/items`, {
+      const response = await fetch(`${API_BASE_URL}/api/receipts/${id}/items`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -268,7 +270,7 @@ const ReceiptDetail: React.FC = () => {
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(
-        `http://localhost:3001/api/receipts/${receipt.id}`,
+        `${API_BASE_URL}/api/receipts/${receipt.id}`,
         {
           method: 'DELETE',
           headers: {
@@ -323,7 +325,7 @@ const ReceiptDetail: React.FC = () => {
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(
-        `http://localhost:3001/api/receipts/${id}/items/${editingItemId}`,
+        `${API_BASE_URL}/api/receipts/${id}/items/${editingItemId}`,
         {
           method: 'PUT',
           headers: {
@@ -367,7 +369,7 @@ const ReceiptDetail: React.FC = () => {
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(
-        `http://localhost:3001/api/receipts/${id}/items/${itemToDelete.id}`,
+        `${API_BASE_URL}/api/receipts/${id}/items/${itemToDelete.id}`,
         {
           method: 'DELETE',
           headers: {
@@ -440,7 +442,7 @@ const ReceiptDetail: React.FC = () => {
     setSaving(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:3001/api/receipts/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/receipts/${id}`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -592,7 +594,7 @@ const ReceiptDetail: React.FC = () => {
               {receipt.image_url ? (
                 <>
                   <img
-                    src={`http://localhost:3001${receipt.image_url}`}
+                    src={`${API_BASE_URL}${receipt.image_url}`}
                     alt="Receipt"
                     className="w-full rounded-lg cursor-zoom-in"
                     onClick={() => setImageZoomed(true)}
@@ -1104,7 +1106,7 @@ const ReceiptDetail: React.FC = () => {
           onClick={() => setImageZoomed(false)}
         >
           <img
-            src={`http://localhost:3001${receipt.image_url}`}
+            src={`${API_BASE_URL}${receipt.image_url}`}
             alt="Receipt (zoomed)"
             className="max-w-full max-h-full object-contain"
           />

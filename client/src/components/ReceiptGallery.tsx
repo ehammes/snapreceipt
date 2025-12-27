@@ -2,6 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CATEGORIES_WITH_ALL } from '../constants/categories';
 
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+
 interface ReceiptItem {
   id: string;
   name: string;
@@ -74,7 +76,7 @@ const ReceiptGallery: React.FC = () => {
         return;
       }
 
-      const response = await fetch('http://localhost:3001/api/receipts', {
+      const response = await fetch(`${API_BASE_URL}/api/receipts`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -269,7 +271,7 @@ const ReceiptGallery: React.FC = () => {
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(
-        `http://localhost:3001/api/receipts/${receiptToDelete.id}`,
+        `${API_BASE_URL}/api/receipts/${receiptToDelete.id}`,
         {
           method: 'DELETE',
           headers: {
@@ -689,7 +691,7 @@ const ReceiptGallery: React.FC = () => {
                 <div className="aspect-[3/4] bg-gray-100 overflow-hidden">
                   {receipt.image_url ? (
                     <img
-                      src={`http://localhost:3001${receipt.image_url}`}
+                      src={`${API_BASE_URL}${receipt.image_url}`}
                       alt={`Receipt from ${receipt.store_name}`}
                       className="w-full h-full object-cover transition-transform duration-200 hover:scale-105"
                     />

@@ -14,6 +14,8 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+
 interface SpendingTimeline {
   month: string;
   amount: number;
@@ -160,7 +162,7 @@ const AnalyticsDashboard: React.FC = () => {
       const token = localStorage.getItem('token');
       if (!token) return;
 
-      const response = await fetch('http://localhost:3001/api/receipts', {
+      const response = await fetch(`${API_BASE_URL}/api/receipts`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -232,10 +234,10 @@ const AnalyticsDashboard: React.FC = () => {
       const headers = { Authorization: `Bearer ${token}` };
 
       const [timelineRes, topItemsRes, categoriesRes, metricsRes] = await Promise.all([
-        fetch('http://localhost:3001/api/analytics/spending-timeline', { headers }),
-        fetch('http://localhost:3001/api/analytics/top-items?limit=10', { headers }),
-        fetch('http://localhost:3001/api/analytics/category-breakdown', { headers }),
-        fetch('http://localhost:3001/api/analytics/summary-metrics', { headers }),
+        fetch(`${API_BASE_URL}/api/analytics/spending-timeline`, { headers }),
+        fetch(`${API_BASE_URL}/api/analytics/top-items?limit=10`, { headers }),
+        fetch(`${API_BASE_URL}/api/analytics/category-breakdown`, { headers }),
+        fetch(`${API_BASE_URL}/api/analytics/summary-metrics`, { headers }),
       ]);
 
       if (!timelineRes.ok || !topItemsRes.ok || !categoriesRes.ok || !metricsRes.ok) {
@@ -289,7 +291,7 @@ const AnalyticsDashboard: React.FC = () => {
         return;
       }
 
-      const response = await fetch('http://localhost:3001/api/receipts', {
+      const response = await fetch(`${API_BASE_URL}/api/receipts`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -342,7 +344,7 @@ const AnalyticsDashboard: React.FC = () => {
         return;
       }
 
-      const response = await fetch('http://localhost:3001/api/receipts', {
+      const response = await fetch(`${API_BASE_URL}/api/receipts`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
