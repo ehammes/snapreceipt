@@ -573,6 +573,9 @@ const ReceiptDetail: React.FC = () => {
 
           {/* Right Column - Details */}
           <div className="space-y-6">
+            {/* Receipt Details Header */}
+            <h1 className="text-2xl font-bold text-gray-800">Receipt Details</h1>
+
             {/* Store Information Card */}
             <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6">
               <div className="flex justify-between items-center mb-4">
@@ -689,6 +692,18 @@ const ReceiptDetail: React.FC = () => {
                   </div>
                   {/* Subtotal, Tax, and Total */}
                   <div className="pt-3 border-t border-gray-200 space-y-2">
+                    {/* Receipt Totals Header */}
+                    <div className="flex justify-between items-center mb-2">
+                      <h3 className="font-semibold text-gray-800">Receipt Totals</h3>
+                      {!editingTotal && (
+                        <button
+                          onClick={handleEditTotalClick}
+                          className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+                        >
+                          Edit
+                        </button>
+                      )}
+                    </div>
                     {editingTotal ? (
                       // Edit Mode - all fields editable
                       <div className="space-y-3">
@@ -771,20 +786,12 @@ const ReceiptDetail: React.FC = () => {
                           </span>
                         </div>
 
-                        {/* Total with Edit button */}
-                        <div className="pt-2 border-t border-gray-100">
-                          <div className="flex items-center justify-between">
-                            <span className="text-gray-800 font-semibold">Total</span>
-                            <button
-                              onClick={handleEditTotalClick}
-                              className="text-blue-600 hover:text-blue-700 text-xs font-medium"
-                            >
-                              Edit
-                            </button>
-                          </div>
-                          <p className="text-2xl font-bold text-green-600 mt-1">
+                        {/* Total */}
+                        <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                          <span className="text-gray-800 font-semibold">Total</span>
+                          <span className="text-xl font-bold text-green-600">
                             {formatCurrency(receipt.total_amount)}
-                          </p>
+                          </span>
                         </div>
                       </>
                     )}
