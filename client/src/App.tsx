@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import Navigation from './components/Navigation';
 import ReceiptUpload from './components/ReceiptUpload';
 import ReceiptGallery from './components/ReceiptGallery';
@@ -143,21 +143,32 @@ const Home = () => (
   </div>
 );
 
+// Layout wrapper to conditionally show navigation
+const AppLayout = () => {
+  const location = useLocation();
+  const hideNavRoutes = ['/register'];
+  const showNav = !hideNavRoutes.includes(location.pathname);
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {showNav && <Navigation />}
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="/upload" element={<ReceiptUpload />} />
+        <Route path="/dashboard" element={<AnalyticsDashboard />} />
+        <Route path="/receipts" element={<ReceiptGallery />} />
+        <Route path="/receipts/:id" element={<ReceiptDetail />} />
+      </Routes>
+    </div>
+  );
+};
+
 function App() {
   return (
     <Router>
-      <div className="min-h-screen bg-gray-50">
-        <Navigation />
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/upload" element={<ReceiptUpload />} />
-          <Route path="/dashboard" element={<AnalyticsDashboard />} />
-          <Route path="/receipts" element={<ReceiptGallery />} />
-          <Route path="/receipts/:id" element={<ReceiptDetail />} />
-        </Routes>
-      </div>
+      <AppLayout />
     </Router>
   );
 }

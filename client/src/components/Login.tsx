@@ -59,12 +59,12 @@ const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 py-8 px-4">
+    <div className="min-h-screen px-4 py-8 bg-gray-100">
       <div className="max-w-md mx-auto">
         {/* Login Card */}
-        <div className="bg-white rounded-lg shadow-lg p-8">
+        <div className="p-8 bg-white rounded-lg shadow-lg">
           {/* Logo/Brand */}
-          <div className="text-center mb-6">
+          <div className="mb-6 text-center">
             <svg
               className="w-12 h-12 mx-auto text-blue-600"
               fill="none"
@@ -78,13 +78,12 @@ const Login: React.FC = () => {
                 d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
               />
             </svg>
-            <h1 className="text-2xl font-bold text-gray-800 mt-4">Welcome Back</h1>
-            <p className="text-gray-600 mt-1">Sign in to your account</p>
+            <h1 className="mt-4 text-2xl font-bold text-gray-800">Log in to SnapReceipt</h1>
           </div>
 
           {/* Error Message */}
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+            <div className="p-3 mb-4 text-sm text-red-700 border border-red-200 rounded-lg bg-red-50">
               {error}
             </div>
           )}
@@ -94,7 +93,7 @@ const Login: React.FC = () => {
             <div>
               <label
                 htmlFor="email"
-                className="block text-sm font-medium text-gray-700 mb-1"
+                className="block mb-1 text-sm font-medium text-gray-700"
               >
                 Email Address
               </label>
@@ -106,7 +105,7 @@ const Login: React.FC = () => {
                 autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                className="w-full px-4 py-2 transition-colors border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
 
@@ -114,7 +113,7 @@ const Login: React.FC = () => {
             <div>
               <label
                 htmlFor="password"
-                className="block text-sm font-medium text-gray-700 mb-1"
+                className="block mb-1 text-sm font-medium text-gray-700"
               >
                 Password
               </label>
@@ -126,7 +125,7 @@ const Login: React.FC = () => {
                 autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                className="w-full px-4 py-2 transition-colors border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
 
@@ -170,11 +169,11 @@ const Login: React.FC = () => {
           </form>
 
           {/* Footer Links */}
-          <div className="mt-6 text-center text-sm text-gray-600">
+          <div className="mt-6 text-sm text-center text-gray-600">
             Don't have an account?{' '}
             <Link
               to="/register"
-              className="text-blue-600 hover:underline font-medium"
+              className="font-medium text-blue-600 hover:underline"
             >
               Sign up
             </Link>
