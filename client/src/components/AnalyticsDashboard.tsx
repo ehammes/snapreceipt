@@ -810,9 +810,9 @@ const AnalyticsDashboard: React.FC = () => {
             </h2>
           </div>
           {categories.length > 0 ? (
-            <div className="flex flex-col lg:flex-row items-center">
-              <div className="w-full lg:w-1/2">
-                <ResponsiveContainer width="100%" height={300}>
+            <div className="flex flex-col md:flex-row items-start gap-6">
+              <div className="w-full md:w-auto flex-shrink-0">
+                <ResponsiveContainer width={280} height={280}>
                   <PieChart>
                     <Pie
                       data={categories as any}
@@ -820,9 +820,11 @@ const AnalyticsDashboard: React.FC = () => {
                       nameKey="category"
                       cx="50%"
                       cy="50%"
-                      outerRadius={100}
-                      label={({ name, percent }) =>
-                        `${name} (${((percent || 0) * 100).toFixed(0)}%)`
+                      innerRadius={55}
+                      outerRadius={95}
+                      paddingAngle={3}
+                      label={({ percent }) =>
+                        (percent || 0) > 0.05 ? `${((percent || 0) * 100).toFixed(0)}%` : ''
                       }
                       labelLine={false}
                     >
@@ -830,39 +832,49 @@ const AnalyticsDashboard: React.FC = () => {
                         <Cell
                           key={`cell-${index}`}
                           fill={COLORS[index % COLORS.length]}
+                          stroke="#fff"
+                          strokeWidth={2}
+                          style={{ cursor: 'pointer' }}
                         />
                       ))}
                     </Pie>
                     <Tooltip
-                      formatter={(value) => [formatCurrency(Number(value)), 'Spent']}
+                      contentStyle={{
+                        backgroundColor: '#fff',
+                        border: 'none',
+                        borderRadius: '8px',
+                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                        padding: '12px 16px',
+                      }}
+                      formatter={(value, name) => [
+                        formatCurrency(Number(value)),
+                        name
+                      ]}
                     />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
 
               {/* Category Legend */}
-              <div className="w-full lg:w-1/2 mt-4 lg:mt-0 lg:pl-4">
-                <div className="space-y-3">
+              <div className="flex-1 w-full">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {categories.map((cat, index) => (
                     <div
                       key={cat.category}
-                      className="flex items-center justify-between"
+                      className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
                     >
                       <div className="flex items-center gap-2">
                         <div
-                          className="w-4 h-4 rounded"
+                          className="w-3 h-3 rounded-full flex-shrink-0"
                           style={{ backgroundColor: COLORS[index % COLORS.length] }}
                         />
-                        <span className="text-sm font-medium text-gray-700">
+                        <span className="text-sm font-medium text-gray-700 truncate">
                           {cat.category}
                         </span>
                       </div>
-                      <div className="text-right">
+                      <div className="text-right flex-shrink-0 ml-2">
                         <span className="text-sm font-semibold text-gray-900">
                           {formatCurrency(cat.totalSpent)}
-                        </span>
-                        <span className="text-xs text-gray-500 ml-2">
-                          ({cat.itemCount} items)
                         </span>
                       </div>
                     </div>
@@ -871,7 +883,7 @@ const AnalyticsDashboard: React.FC = () => {
               </div>
             </div>
           ) : (
-            <div className="h-64 flex items-center justify-center text-gray-500">
+            <div className="py-12 flex items-center justify-center text-gray-500">
               No category data available
             </div>
           )}
