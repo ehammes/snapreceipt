@@ -50,7 +50,7 @@ const Navigation: React.FC = () => {
               />
             </svg>
             <span className="font-bold text-xl text-gray-800">
-              Costco Tracker
+              SnapReceipt
             </span>
           </Link>
 

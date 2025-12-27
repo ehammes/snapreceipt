@@ -16,12 +16,12 @@ describe('App', () => {
   describe('Home Page', () => {
     it('renders the main heading', () => {
       renderWithRouter(<App />);
-      expect(screen.getByText('Costco Receipt Tracker')).toBeInTheDocument();
+      expect(screen.getByText('SnapReceipt')).toBeInTheDocument();
     });
 
     it('renders the subtitle', () => {
       renderWithRouter(<App />);
-      expect(screen.getByText('Upload and track your Costco spending')).toBeInTheDocument();
+      expect(screen.getByText('Upload receipts and track your spending')).toBeInTheDocument();
     });
 
     it('renders the Upload Receipt card', () => {
@@ -70,7 +70,7 @@ describe('App', () => {
   describe('Navigation', () => {
     it('renders the navigation bar', () => {
       renderWithRouter(<App />);
-      expect(screen.getByText('Costco Tracker')).toBeInTheDocument();
+      expect(screen.getByText('SnapReceipt')).toBeInTheDocument();
     });
 
     it('renders nav links', () => {

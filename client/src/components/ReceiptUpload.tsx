@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import ReceiptReviewModal, { ReviewData, ReviewItem } from './ReceiptReviewModal';
+import ReceiptReviewModal, { ReviewData } from './ReceiptReviewModal';
 
 interface ProcessedItem {
   id?: string;
@@ -68,7 +68,7 @@ const ReceiptUpload: React.FC = () => {
   // Convert processed data to review data format
   const convertToReviewData = (data: ProcessedReceipt): ReviewData => {
     return {
-      storeName: data.storeName || 'Costco',
+      storeName: data.storeName || '',
       storeLocation: data.storeLocation || '',
       storeCity: data.storeCity || '',
       storeState: data.storeState || '',
@@ -131,7 +131,7 @@ const ReceiptUpload: React.FC = () => {
 
       // Convert the response data to review format
       const processedData: ProcessedReceipt = {
-        storeName: data.data?.store_name || data.data?.storeName || 'Costco',
+        storeName: data.data?.store_name || data.data?.storeName || '',
         storeLocation: data.data?.store_location || data.data?.storeLocation || '',
         storeCity: data.data?.store_city || data.data?.storeCity || '',
         storeState: data.data?.store_state || data.data?.storeState || '',
@@ -423,7 +423,7 @@ const ReceiptUpload: React.FC = () => {
           <div className="mb-6">
             <h1 className="text-2xl font-bold text-gray-800">Upload Receipt</h1>
             <p className="text-gray-600 mt-1">
-              Take a photo or choose an image of your Costco receipt
+              Take a photo or choose an image of your receipt
             </p>
           </div>
 

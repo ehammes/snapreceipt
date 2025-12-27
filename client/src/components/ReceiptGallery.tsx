@@ -346,7 +346,7 @@ const ReceiptGallery: React.FC = () => {
               No receipts uploaded yet
             </h2>
             <p className="text-gray-600 mb-6">
-              Start tracking your Costco spending by uploading your first receipt.
+              Start tracking your spending by uploading your first receipt.
             </p>
             <button
               onClick={() => navigate('/upload')}
@@ -673,7 +673,7 @@ const ReceiptGallery: React.FC = () => {
                 {/* Card Content */}
                 <div className="p-4">
                   <h3 className="font-semibold text-lg text-gray-800 truncate">
-                    {receipt.store_name || 'Costco'}
+                    {receipt.store_name || 'Store'}
                   </h3>
                   <p className="text-gray-600 text-sm">
                     {formatDate(receipt.purchase_date)}
@@ -735,7 +735,7 @@ const ReceiptGallery: React.FC = () => {
               {/* Receipt Preview */}
               <div className="bg-gray-50 rounded-lg p-3 mb-6">
                 <p className="font-medium text-gray-800">
-                  {receiptToDelete.store_name || 'Costco'}
+                  {receiptToDelete.store_name || 'Store'}
                 </p>
                 <p className="text-sm text-gray-600">
                   {formatDate(receiptToDelete.purchase_date)}

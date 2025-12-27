@@ -93,7 +93,7 @@ const Register: React.FC = () => {
               Create Your Account
             </h1>
             <p className="text-gray-600 mt-1">
-              Track your Costco receipts and spending
+              Track your receipts and spending
             </p>
           </div>
 

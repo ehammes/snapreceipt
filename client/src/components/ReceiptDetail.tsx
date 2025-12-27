@@ -669,7 +669,7 @@ const ReceiptDetail: React.FC = () => {
               ) : (
                 <div className="space-y-3">
                   <p className="text-xl font-semibold text-gray-800">
-                    {receipt.store_name || 'Costco'}
+                    {receipt.store_name || 'Store'}
                   </p>
                   {receipt.store_location && (
                     <p className="text-gray-600">{receipt.store_location}</p>
@@ -1122,7 +1122,7 @@ const ReceiptDetail: React.FC = () => {
             {/* Receipt Preview */}
             <div className="bg-gray-50 rounded-lg p-3 mb-6">
               <p className="font-medium text-gray-800">
-                {receipt.store_name || 'Costco'}
+                {receipt.store_name || 'Store'}
               </p>
               <p className="text-sm text-gray-600">
                 {formatDate(receipt.purchase_date)}
