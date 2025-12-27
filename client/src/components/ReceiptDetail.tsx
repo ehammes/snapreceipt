@@ -88,6 +88,8 @@ const ReceiptDetail: React.FC = () => {
   // Total amount edit state
   const [editingTotal, setEditingTotal] = useState(false);
   const [totalForm, setTotalForm] = useState('');
+  const [subtotalForm, setSubtotalForm] = useState('');
+  const [taxForm, setTaxForm] = useState('');
 
   // Item sorting state
   const [itemSortBy, setItemSortBy] = useState<'receipt' | 'totalPrice'>('receipt');
@@ -394,10 +396,41 @@ const ReceiptDetail: React.FC = () => {
     setItemToDelete(null);
   };
 
+  // Calculate subtotal from items safely
+  const calculateSubtotal = () => {
+    if (!receipt?.items || receipt.items.length === 0) return 0;
+    return receipt.items.reduce((sum, item) => sum + (Number(item.total_price) || 0), 0);
+  };
+
+  // Calculate tax as total minus subtotal
+  const calculateTax = () => {
+    const subtotal = calculateSubtotal();
+    return Math.max(0, (Number(receipt?.total_amount) || 0) - subtotal);
+  };
+
   // Total amount edit handlers
   const handleEditTotalClick = () => {
+    const subtotal = calculateSubtotal();
+    const tax = calculateTax();
+    setSubtotalForm(subtotal.toFixed(2));
+    setTaxForm(tax.toFixed(2));
     setTotalForm(String(receipt?.total_amount || 0));
     setEditingTotal(true);
+  };
+
+  // Update total when subtotal or tax changes
+  const handleSubtotalChange = (value: string) => {
+    setSubtotalForm(value);
+    const subtotal = parseFloat(value) || 0;
+    const tax = parseFloat(taxForm) || 0;
+    setTotalForm((subtotal + tax).toFixed(2));
+  };
+
+  const handleTaxChange = (value: string) => {
+    setTaxForm(value);
+    const subtotal = parseFloat(subtotalForm) || 0;
+    const tax = parseFloat(value) || 0;
+    setTotalForm((subtotal + tax).toFixed(2));
   };
 
   const handleSaveTotal = async () => {
@@ -654,33 +687,55 @@ const ReceiptDetail: React.FC = () => {
                       {formatDate(receipt.upload_date)}
                     </p>
                   </div>
-                  {/* Total Amount with Edit */}
-                  <div className="pt-3 border-t border-gray-200">
-                    <div className="flex items-center justify-between">
-                      <span className="text-gray-500 text-sm">Total</span>
-                      {!editingTotal && (
-                        <button
-                          onClick={handleEditTotalClick}
-                          className="text-blue-600 hover:text-blue-700 text-sm font-medium"
-                        >
-                          Edit
-                        </button>
-                      )}
-                    </div>
+                  {/* Subtotal, Tax, and Total */}
+                  <div className="pt-3 border-t border-gray-200 space-y-2">
                     {editingTotal ? (
-                      <div className="mt-2 space-y-3">
-                        <div className="relative">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            value={totalForm}
-                            onChange={(e) => setTotalForm(e.target.value)}
-                            className="w-full border border-gray-300 rounded-lg pl-7 pr-3 py-2 text-xl font-bold text-green-600 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          />
+                      // Edit Mode - all fields editable
+                      <div className="space-y-3">
+                        {/* Editable Subtotal */}
+                        <div className="flex items-center justify-between">
+                          <span className="text-gray-500 text-sm">Subtotal</span>
+                          <div className="relative w-28">
+                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={subtotalForm}
+                              onChange={(e) => handleSubtotalChange(e.target.value)}
+                              className="w-full border border-gray-300 rounded-lg pl-6 pr-2 py-1.5 text-right text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            />
+                          </div>
                         </div>
-                        <div className="flex gap-2">
+
+                        {/* Editable Tax */}
+                        <div className="flex items-center justify-between">
+                          <span className="text-gray-500 text-sm">Tax</span>
+                          <div className="relative w-28">
+                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={taxForm}
+                              onChange={(e) => handleTaxChange(e.target.value)}
+                              className="w-full border border-gray-300 rounded-lg pl-6 pr-2 py-1.5 text-right text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Total (auto-calculated) */}
+                        <div className="pt-2 border-t border-gray-100">
+                          <div className="flex items-center justify-between">
+                            <span className="text-gray-800 font-semibold">Total</span>
+                            <span className="text-xl font-bold text-green-600">
+                              {formatCurrency(parseFloat(totalForm) || 0)}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Save/Cancel buttons */}
+                        <div className="flex gap-2 pt-2">
                           <button
                             onClick={handleSaveTotal}
                             disabled={saving || !totalForm}
@@ -698,9 +753,40 @@ const ReceiptDetail: React.FC = () => {
                         </div>
                       </div>
                     ) : (
-                      <p className="text-2xl font-bold text-green-600 mt-1">
-                        {formatCurrency(receipt.total_amount)}
-                      </p>
+                      // View Mode
+                      <>
+                        {/* Subtotal - calculated from items */}
+                        <div className="flex items-center justify-between">
+                          <span className="text-gray-500 text-sm">Subtotal</span>
+                          <span className="text-gray-700 font-medium">
+                            {formatCurrency(calculateSubtotal())}
+                          </span>
+                        </div>
+
+                        {/* Tax - calculated as total minus subtotal */}
+                        <div className="flex items-center justify-between">
+                          <span className="text-gray-500 text-sm">Tax</span>
+                          <span className="text-gray-700 font-medium">
+                            {formatCurrency(calculateTax())}
+                          </span>
+                        </div>
+
+                        {/* Total with Edit button */}
+                        <div className="pt-2 border-t border-gray-100">
+                          <div className="flex items-center justify-between">
+                            <span className="text-gray-800 font-semibold">Total</span>
+                            <button
+                              onClick={handleEditTotalClick}
+                              className="text-blue-600 hover:text-blue-700 text-xs font-medium"
+                            >
+                              Edit
+                            </button>
+                          </div>
+                          <p className="text-2xl font-bold text-green-600 mt-1">
+                            {formatCurrency(receipt.total_amount)}
+                          </p>
+                        </div>
+                      </>
                     )}
                   </div>
                 </div>

@@ -362,8 +362,9 @@ class OCRService {
     // Pattern for price line: price followed by optional tax code (A, E, F, etc.)
     const priceLineRegex = /^(\d+\.\d{2})\s*([A-Z])?\s*$/;
 
-    // Pattern for discount line: negative price like "8.00-A"
-    const discountLineRegex = /^(\d+\.\d{2})-([A-Z])?\s*$/;
+    // Pattern for discount line: negative price like "8.00-A" or "800-A" (OCR may miss decimal)
+    // Captures: group 1 = amount (may or may not have decimal), group 2 = tax code
+    const discountLineRegex = /^(\d+(?:\.\d{2})?)-([A-Z])?\s*$/;
 
     // Pattern for item with price on same line (with optional tax code prefix)
     // Note: $ can be OCR error for 8 or S
@@ -373,25 +374,44 @@ class OCRService {
     const pendingItems: Array<{ itemNumber: string; name: string; order: number }> = [];
     // Buffer for collecting consecutive prices when multiple items are pending
     const pendingPrices: Array<{ price: number; order: number }> = [];
+    // Buffer for pending discounts (apply to first pending price when matching)
+    const pendingDiscounts: Array<{ discount: number; order: number }> = [];
     let orphanPrice: { price: number; order: number } | null = null;
 
     // Collect raw items first (before merging duplicates)
     // Include order to track position on receipt
     const rawItems: Array<ParsedItem & { order: number }> = [];
 
+    // Helper function to apply pending discounts to prices
+    // Discounts apply to the FIRST price (which corresponds to the first item in multi-column)
+    const applyPendingDiscounts = (prices: Array<{ price: number; order: number }>) => {
+      if (pendingDiscounts.length === 0 || prices.length === 0) return;
+
+      // Apply each discount to the first price
+      for (const discountInfo of pendingDiscounts) {
+        const firstPrice = prices[0];
+        const originalPrice = firstPrice.price;
+        firstPrice.price = Math.round((firstPrice.price - discountInfo.discount) * 100) / 100;
+        console.log(`Applied pending discount: $${originalPrice} - $${discountInfo.discount} = $${firstPrice.price}`);
+      }
+      pendingDiscounts.length = 0;
+    };
+
     // Helper function to match pending items with pending prices
     const matchPendingItemsAndPrices = () => {
       if (pendingItems.length === 0 || pendingPrices.length === 0) return;
 
-      // When we have equal counts, prices may be in reverse order due to multi-column OCR
-      // Match them in reverse order (last price to first item)
+      // Apply any pending discounts to prices before matching
+      applyPendingDiscounts(pendingPrices);
+
+      // When we have equal counts, match in same order (FIFO)
+      // In Costco receipts, items and prices appear in the same order
+      // (left column = items, right column = prices, both top to bottom)
       if (pendingItems.length === pendingPrices.length) {
-        console.log(`Matching ${pendingItems.length} items with ${pendingPrices.length} prices (reverse order for multi-column)`);
-        // Reverse prices to match items correctly
-        const reversedPrices = [...pendingPrices].reverse();
+        console.log(`Matching ${pendingItems.length} items with ${pendingPrices.length} prices (FIFO order)`);
         for (let k = 0; k < pendingItems.length; k++) {
           const item = pendingItems[k];
-          const priceInfo = reversedPrices[k];
+          const priceInfo = pendingPrices[k];
           rawItems.push({
             itemNumber: item.itemNumber,
             name: item.name,
@@ -400,7 +420,7 @@ class OCRService {
             totalPrice: priceInfo.price,
             order: item.order,
           });
-          console.log(`Found item (multi-column match): [${item.itemNumber}] ${item.name} = $${priceInfo.price} (order: ${item.order})`);
+          console.log(`Found item (FIFO match): [${item.itemNumber}] ${item.name} = $${priceInfo.price} (order: ${item.order})`);
         }
         pendingItems.length = 0;
         pendingPrices.length = 0;
@@ -483,14 +503,34 @@ class OCRService {
         continue;
       }
 
-      // Check for discount line (applies to last item)
+      // Check for discount line
       const discountMatch = line.match(discountLineRegex);
-      if (discountMatch && rawItems.length > 0) {
-        const discount = parseFloat(discountMatch[1]);
-        const lastItem = rawItems[rawItems.length - 1];
-        lastItem.totalPrice = Math.round((lastItem.totalPrice - discount) * 100) / 100;
-        lastItem.unitPrice = lastItem.totalPrice / lastItem.quantity;
-        console.log(`Applied discount: -$${discount} to ${lastItem.name}`);
+      if (discountMatch) {
+        let discount = parseFloat(discountMatch[1]);
+        // If no decimal in original (e.g., "800" instead of "8.00"), divide by 100
+        if (!discountMatch[1].includes('.')) {
+          discount = discount / 100;
+        }
+
+        // If we have pending prices, apply discount to first pending price
+        if (pendingPrices.length > 0) {
+          const firstPrice = pendingPrices[0];
+          const originalPrice = firstPrice.price;
+          firstPrice.price = Math.round((firstPrice.price - discount) * 100) / 100;
+          console.log(`Applied discount to pending price: $${originalPrice} - $${discount} = $${firstPrice.price}`);
+        }
+        // If items are pending but no prices yet, buffer the discount
+        else if (pendingItems.length > 0) {
+          pendingDiscounts.push({ discount, order: i });
+          console.log(`Buffered discount: $${discount} (pending items: ${pendingItems.length})`);
+        }
+        // If we have raw items, apply to last item (original behavior)
+        else if (rawItems.length > 0) {
+          const lastItem = rawItems[rawItems.length - 1];
+          lastItem.totalPrice = Math.round((lastItem.totalPrice - discount) * 100) / 100;
+          lastItem.unitPrice = lastItem.totalPrice / lastItem.quantity;
+          console.log(`Applied discount: -$${discount} to ${lastItem.name}`);
+        }
         continue;
       }
 
@@ -621,21 +661,33 @@ class OCRService {
     const lines = text.split('\n').map(l => l.trim());
 
     // PRIORITY 1: Look for FIRST **** TOTAL followed by amount
-    // This is the actual receipt total BEFORE any CC rewards or discounts
-    // Pattern in Costco receipts:
-    //   **** TOTAL
-    //   353.04
-    // Later there may be another **** TOTAL with the amount charged to card (after rewards)
+    // In Costco receipts, after **** TOTAL we may see:
+    //   - Masked card number (XXXX5089)
+    //   - Random item prices from multi-column OCR (59.99 A)
+    //   - Subtotal, Tax, Total values as standalone numbers (427.03, 25.39, 452.42)
+    // The actual TOTAL is typically the LARGEST standalone number in this section
     for (let i = 0; i < lines.length; i++) {
       if (/^\*+\s*TOTAL/i.test(lines[i])) {
-        // Look for price in the next few lines (skip masked card number)
-        for (let j = i + 1; j < Math.min(i + 4, lines.length); j++) {
-          const priceMatch = lines[j].match(/^(\d+\.\d{2})$/);
-          if (priceMatch) {
-            result.totalAmount = parseFloat(priceMatch[1]);
-            console.log(`Found total after TOTAL marker: $${result.totalAmount}`);
-            return;
+        // Collect all standalone price values in the next several lines
+        const priceValues: number[] = [];
+        for (let j = i + 1; j < Math.min(i + 15, lines.length); j++) {
+          const line = lines[j];
+          // Stop if we hit another section marker
+          if (/^(CHANGE|APPROVED|Costco Visa|A \d+\.\d+% Tax|E \d+\.\d+% Tax|TOTAL NUMBER|INSTANT SAVINGS)/i.test(line)) {
+            break;
           }
+          // Match standalone prices (not prices with tax codes like "59.99 A")
+          const priceMatch = line.match(/^(\d+\.\d{2})$/);
+          if (priceMatch) {
+            priceValues.push(parseFloat(priceMatch[1]));
+          }
+        }
+
+        // The actual total is the largest value (total > subtotal > tax)
+        if (priceValues.length > 0) {
+          result.totalAmount = Math.max(...priceValues);
+          console.log(`Found total values after TOTAL marker: [${priceValues.join(', ')}], using largest: $${result.totalAmount}`);
+          return;
         }
       }
     }
