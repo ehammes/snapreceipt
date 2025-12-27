@@ -145,7 +145,7 @@ const Home = () => {
   return (
     <div className="min-h-[calc(100vh-64px)] bg-gradient-to-br from-slate-50 via-white to-blue-50 overflow-hidden">
       {/* Hero Section - ClickUp inspired */}
-      <div className="relative px-6 pt-12 pb-16 sm:px-10 sm:pt-16 sm:pb-20">
+      <div className="relative px-6 pt-10 pb-6 sm:px-10 sm:pt-12 sm:pb-8">
         {/* Decorative floating elements */}
         <div className="absolute w-20 h-20 rounded-full top-20 left-10 bg-blue-400/20 blur-2xl animate-pulse" />
         <div className="absolute w-32 h-32 rounded-full top-40 right-16 bg-purple-400/20 blur-2xl animate-pulse" style={{ animationDelay: '1s' }} />
@@ -223,46 +223,73 @@ const Home = () => {
             </div>
           )}
 
-          {/* Quick Stats for logged-in users */}
-          {isLoggedIn && !loading && stats && hasReceipts && (
-            <div className="flex flex-wrap items-center justify-center gap-4 mt-6 text-sm">
-              <div className="flex items-center gap-2 px-5 py-2.5 bg-white rounded-full shadow-md border border-gray-100">
-                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="font-medium text-gray-700">{stats.totalReceipts} receipts tracked</span>
-              </div>
-              <div className="flex items-center gap-2 px-5 py-2.5 bg-white rounded-full shadow-md border border-gray-100">
-                <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
-                <span className="font-medium text-gray-700">{formatCurrency(stats.totalSpent)} total spending</span>
-              </div>
-            </div>
-          )}
         </div>
       </div>
 
       <div className="px-6 pb-10 sm:px-10">
         <div className="max-w-5xl mx-auto">
 
-        {/* Monthly Spending Highlight - for logged-in users with receipts */}
+        {/* Analytics Section - for logged-in users with receipts */}
         {isLoggedIn && !loading && stats && hasReceipts && (
-          <div className="p-6 mb-8 text-white shadow-lg bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div>
-                <p className="text-sm font-medium text-indigo-100">This Month</p>
-                <p className="text-3xl font-bold">{formatCurrency(stats.monthlySpent)}</p>
-                <p className="mt-1 text-sm text-indigo-200">
-                  across {stats.monthlyReceipts} receipt{stats.monthlyReceipts !== 1 ? 's' : ''}
-                </p>
+          <div className="mb-6 space-y-4">
+            {/* Quick Stats Pills */}
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              <div className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full shadow-md">
+                <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
+                <span className="text-sm font-medium text-white">{formatCurrency(stats.monthlySpent)} this month</span>
+              </div>
+              <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-full shadow-sm border border-gray-100">
+                <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                <span className="text-sm font-medium text-gray-700">{formatCurrency(stats.totalSpent)} all time</span>
+              </div>
+              <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-full shadow-sm border border-gray-100">
+                <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+                <span className="text-sm font-medium text-gray-700">{stats.totalReceipts} receipts</span>
               </div>
               <Link
                 to="/dashboard"
-                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors rounded-lg bg-white/20 hover:bg-white/30"
+                className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-purple-700 bg-purple-50 hover:bg-purple-100 rounded-full transition-colors"
               >
-                View Analytics
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                 </svg>
+                View Analytics
               </Link>
             </div>
+
+            {/* Recent Activity */}
+            {stats.recentReceipts.length > 0 && (
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-lg font-bold text-gray-900">Recent Activity</h3>
+                  <Link to="/receipts" className="text-sm font-medium text-blue-600 hover:text-blue-700">
+                    View all
+                  </Link>
+                </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  {stats.recentReceipts.map((receipt) => (
+                    <Link
+                      key={receipt.id}
+                      to={`/receipts/${receipt.id}`}
+                      className="p-4 transition-all bg-white border border-gray-100 shadow-sm rounded-xl hover:shadow-md hover:border-gray-200 group"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center justify-center flex-shrink-0 w-10 h-10 transition-colors bg-gray-100 rounded-lg group-hover:bg-blue-50">
+                          <svg className="w-5 h-5 text-gray-400 group-hover:text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-gray-900 truncate">{receipt.store_name || 'Receipt'}</p>
+                          <p className="text-sm text-gray-500">{formatDate(receipt.purchase_date)}</p>
+                        </div>
+                        <p className="font-semibold text-gray-900">{formatCurrency(Number(receipt.total_amount))}</p>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -375,40 +402,6 @@ const Home = () => {
             </div>
           </Link>
         </div>
-
-        {/* Recent Activity - for logged-in users with receipts */}
-        {isLoggedIn && !loading && stats && hasReceipts && stats.recentReceipts.length > 0 && (
-          <div className="mt-8">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-gray-900">Recent Activity</h2>
-              <Link to="/receipts" className="text-sm font-medium text-blue-600 hover:text-blue-700">
-                View all
-              </Link>
-            </div>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              {stats.recentReceipts.map((receipt) => (
-                <Link
-                  key={receipt.id}
-                  to={`/receipts/${receipt.id}`}
-                  className="p-4 transition-all bg-white border border-gray-100 shadow-sm rounded-xl hover:shadow-md hover:border-gray-200 group"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center justify-center flex-shrink-0 w-10 h-10 transition-colors bg-gray-100 rounded-lg group-hover:bg-blue-50">
-                      <svg className="w-5 h-5 text-gray-400 group-hover:text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-gray-900 truncate">{receipt.store_name || 'Receipt'}</p>
-                      <p className="text-sm text-gray-500">{formatDate(receipt.purchase_date)}</p>
-                    </div>
-                    <p className="font-semibold text-gray-900">{formatCurrency(Number(receipt.total_amount))}</p>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* How It Works Section */}
         <div className="p-8 mt-12 border border-gray-100 shadow-lg bg-white/70 backdrop-blur rounded-2xl">
