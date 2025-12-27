@@ -1,8 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import ReceiptReviewModal, { ReviewData } from './ReceiptReviewModal';
-
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+import { API_BASE_URL } from '../config/api';
 
 interface ProcessedItem {
   id?: string;

@@ -121,10 +121,21 @@ class OCRService {
 
   constructor() {
     try {
-      this.visionClient = new ImageAnnotatorClient({
-        keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS,
-      });
-      console.log('Google Vision API client initialized');
+      // Support both file path (local dev) and JSON string (production/Railway)
+      if (process.env.GOOGLE_CREDENTIALS_JSON) {
+        // Production: credentials passed as JSON string
+        const credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS_JSON);
+        this.visionClient = new ImageAnnotatorClient({ credentials });
+        console.log('Google Vision API client initialized with JSON credentials');
+      } else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+        // Local development: credentials from file
+        this.visionClient = new ImageAnnotatorClient({
+          keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS,
+        });
+        console.log('Google Vision API client initialized with file credentials');
+      } else {
+        throw new Error('No Google credentials configured');
+      }
     } catch (error) {
       console.error('Failed to initialize Google Vision API client:', error);
       throw new Error('Failed to initialize OCR service');

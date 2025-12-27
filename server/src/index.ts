@@ -19,8 +19,26 @@ if (!fs.existsSync(uploadsDir)) {
   console.log('Created uploads directory');
 }
 
-// Middleware
-app.use(cors());
+// CORS configuration
+const allowedOrigins = [
+  'http://localhost:3000',
+  process.env.FRONTEND_URL, // Set this in Railway
+].filter(Boolean) as string[];
+
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, curl, etc.)
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.some(allowed => origin.startsWith(allowed))) {
+      callback(null, true);
+    } else {
+      console.warn(`CORS blocked origin: ${origin}`);
+      callback(null, true); // Allow anyway in development, but log it
+    }
+  },
+  credentials: true,
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { API_BASE_URL } from '../config/api';
 
 const Register: React.FC = () => {
   const navigate = useNavigate();
@@ -37,7 +38,7 @@ const Register: React.FC = () => {
 
     try {
       // Register the user
-      const registerRes = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3001'}/api/auth/register`, {
+      const registerRes = await fetch(`${API_BASE_URL}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation, Link } from 'react-router-dom';
+import { API_BASE_URL } from './config/api';
 import Navigation from './components/Navigation';
 import Footer from './components/Footer';
 import ReceiptUpload from './components/ReceiptUpload';
@@ -73,7 +74,7 @@ const Home = () => {
 
   const fetchStats = async (token: string) => {
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:3001'}/api/receipts`, {
+      const response = await fetch(`${API_BASE_URL}/api/receipts`, {
         headers: { 'Authorization': `Bearer ${token}` },
       });
 

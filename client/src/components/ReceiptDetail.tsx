@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { CATEGORIES } from '../constants/categories';
-
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+import { API_BASE_URL } from '../config/api';
 
 interface ReceiptItem {
   id: string;
