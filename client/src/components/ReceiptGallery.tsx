@@ -33,6 +33,7 @@ interface Filters {
   minAmount: string;
   maxAmount: string;
   category: string;
+  storeName: string;
 }
 
 const ReceiptGallery: React.FC = () => {
@@ -48,6 +49,7 @@ const ReceiptGallery: React.FC = () => {
     minAmount: '',
     maxAmount: '',
     category: '',
+    storeName: '',
   });
 
   // Sort state
@@ -105,7 +107,8 @@ const ReceiptGallery: React.FC = () => {
       filters.endDate !== '' ||
       filters.minAmount !== '' ||
       filters.maxAmount !== '' ||
-      filters.category !== ''
+      filters.category !== '' ||
+      filters.storeName !== ''
     );
   }, [filters]);
 
@@ -118,8 +121,20 @@ const ReceiptGallery: React.FC = () => {
     if (filters.minAmount) count++;
     if (filters.maxAmount) count++;
     if (filters.category) count++;
+    if (filters.storeName) count++;
     return count;
   }, [filters]);
+
+  // Get unique store names for filter dropdown
+  const uniqueStoreNames = useMemo(() => {
+    const stores = new Set<string>();
+    receipts.forEach((receipt) => {
+      if (receipt.store_name) {
+        stores.add(receipt.store_name);
+      }
+    });
+    return Array.from(stores).sort();
+  }, [receipts]);
 
   // Apply filters to receipts
   const filteredReceipts = useMemo(() => {
@@ -183,6 +198,13 @@ const ReceiptGallery: React.FC = () => {
         }
       }
 
+      // Store name filter
+      if (filters.storeName) {
+        if (receipt.store_name !== filters.storeName) {
+          return false;
+        }
+      }
+
       return true;
     });
   }, [receipts, filters]);
@@ -229,6 +251,7 @@ const ReceiptGallery: React.FC = () => {
       minAmount: '',
       maxAmount: '',
       category: '',
+      storeName: '',
     });
   };
 
@@ -506,6 +529,25 @@ const ReceiptGallery: React.FC = () => {
                     onChange={(e) => handleFilterChange('endDate', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
+                </div>
+
+                {/* Store Name */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Store
+                  </label>
+                  <select
+                    value={filters.storeName}
+                    onChange={(e) => handleFilterChange('storeName', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="">All Stores</option>
+                    {uniqueStoreNames.map((store) => (
+                      <option key={store} value={store}>
+                        {store}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 {/* Category */}
