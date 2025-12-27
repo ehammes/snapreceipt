@@ -146,7 +146,7 @@ const Home = () => (
 // Layout wrapper to conditionally show navigation
 const AppLayout = () => {
   const location = useLocation();
-  const hideNavRoutes = ['/register'];
+  const hideNavRoutes = ['/register', '/login'];
   const showNav = !hideNavRoutes.includes(location.pathname);
 
   return (

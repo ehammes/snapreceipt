@@ -59,73 +59,102 @@ const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen px-4 py-8 bg-gray-100">
-      <div className="max-w-md mx-auto">
-        {/* Login Card */}
-        <div className="p-8 bg-white rounded-lg shadow-lg">
-          {/* Logo/Brand */}
-          <div className="mb-6 text-center">
+    <div className="relative flex items-start justify-center min-h-screen px-4 pt-16 pb-12 overflow-hidden bg-gradient-to-br from-slate-50 via-white to-blue-50">
+      {/* Background decorations */}
+      <div className="absolute top-0 right-0 -translate-y-1/2 bg-blue-100 rounded-full w-96 h-96 opacity-30 translate-x-1/3" />
+      <div className="absolute bottom-0 left-0 translate-y-1/2 bg-indigo-100 rounded-full w-80 h-80 opacity-30 -translate-x-1/3" />
+
+      <div className="relative z-10 w-full max-w-md">
+        {/* Logo */}
+        <Link to="/" className="flex items-center justify-center gap-2 mb-8">
+          <div className="relative w-12 h-12">
             <svg
-              className="w-12 h-12 mx-auto text-blue-600"
+              className="absolute inset-0 w-12 h-12 text-blue-600"
               fill="none"
               stroke="currentColor"
-              viewBox="0 0 24 24"
+              viewBox="0 0 36 36"
+            >
+              <path strokeLinecap="round" strokeWidth={2.5} d="M4 12V6a2 2 0 012-2h6" />
+              <path strokeLinecap="round" strokeWidth={2.5} d="M24 4h6a2 2 0 012 2v6" />
+              <path strokeLinecap="round" strokeWidth={2.5} d="M4 24v6a2 2 0 002 2h6" />
+              <path strokeLinecap="round" strokeWidth={2.5} d="M32 24v6a2 2 0 01-2 2h-6" />
+            </svg>
+            <svg
+              className="absolute inset-0 w-12 h-12 text-blue-500"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 36 36"
             >
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                strokeWidth={1.5}
+                d="M12 9h12v18l-3-2-3 2-3-2-3 2V9z"
               />
+              <path strokeLinecap="round" strokeWidth={1.5} d="M14 14h8M14 18h6" />
             </svg>
-            <h1 className="mt-4 text-2xl font-bold text-gray-800">Log in to SnapReceipt</h1>
+          </div>
+          <span className="text-2xl font-bold text-gray-800">SnapReceipt</span>
+        </Link>
+
+        {/* Login Card */}
+        <div className="p-8 bg-white border border-gray-100 shadow-xl rounded-2xl">
+          {/* Heading */}
+          <div className="mb-8 text-center">
+            <h1 className="text-2xl font-bold text-gray-900">Log in to your account</h1>
+            {/* <p className="mt-2 text-gray-500">Log in to your account to continue</p> */}
           </div>
 
           {/* Error Message */}
           {error && (
-            <div className="p-3 mb-4 text-sm text-red-700 border border-red-200 rounded-lg bg-red-50">
+            <div className="flex items-start gap-2 p-4 mb-6 text-sm text-red-700 border-l-4 border-red-500 rounded-r-lg bg-red-50">
+              <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+              </svg>
               {error}
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-5">
             {/* Email Field */}
             <div>
               <label
                 htmlFor="email"
-                className="block mb-1 text-sm font-medium text-gray-700"
+                className="block mb-2 text-sm font-medium text-gray-700"
               >
-                Email Address
+                Email
               </label>
               <input
                 id="email"
                 type="email"
                 required
-                placeholder="your@email.com"
+                placeholder="Enter your email"
                 autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-2 transition-colors border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-4 py-3 text-gray-900 placeholder-gray-400 transition-all border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
 
             {/* Password Field */}
             <div>
-              <label
-                htmlFor="password"
-                className="block mb-1 text-sm font-medium text-gray-700"
-              >
-                Password
-              </label>
+              <div className="flex items-center justify-between mb-2">
+                <label
+                  htmlFor="password"
+                  className="block text-sm font-medium text-gray-700"
+                >
+                  Password
+                </label>
+              </div>
               <input
                 id="password"
                 type="password"
                 required
-                placeholder="Your password"
+                placeholder="Enter your password"
                 autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-2 transition-colors border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-4 py-3 text-gray-900 placeholder-gray-400 transition-all border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
 
@@ -133,10 +162,10 @@ const Login: React.FC = () => {
             <button
               type="submit"
               disabled={loading}
-              className={`w-full py-3 rounded-lg font-medium text-white transition-colors ${
+              className={`w-full py-3.5 rounded-xl font-semibold text-white transition-all ${
                 loading
                   ? 'bg-blue-400 cursor-not-allowed'
-                  : 'bg-blue-600 hover:bg-blue-700'
+                  : 'bg-blue-600 hover:bg-blue-700 hover:shadow-lg active:scale-[0.99]'
               }`}
             >
               {loading ? (
@@ -163,22 +192,39 @@ const Login: React.FC = () => {
                   Logging in...
                 </span>
               ) : (
-                'Log In'
+                'Log in'
               )}
             </button>
           </form>
 
-          {/* Footer Links */}
-          <div className="mt-6 text-sm text-center text-gray-600">
-            Don't have an account?{' '}
-            <Link
-              to="/register"
-              className="font-medium text-blue-600 hover:underline"
-            >
-              Sign up
-            </Link>
+          {/* Divider */}
+          <div className="relative my-8">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-200"></div>
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-4 text-gray-500 bg-white">or</span>
+            </div>
+          </div>
+
+          {/* Sign Up Link */}
+          <div className="text-center">
+            <p className="text-gray-600">
+              Don't have an account?{' '}
+              <Link
+                to="/register"
+                className="font-semibold text-blue-600 hover:text-blue-700"
+              >
+                Sign up for free
+              </Link>
+            </p>
           </div>
         </div>
+
+        {/* Footer */}
+        {/* <p className="mt-8 text-sm text-center text-gray-400">
+          By logging in, you agree to our Terms of Service
+        </p> */}
       </div>
     </div>
   );
