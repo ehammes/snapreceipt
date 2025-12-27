@@ -16,18 +16,20 @@ describe('App', () => {
   describe('Home Page', () => {
     it('renders the main heading', () => {
       renderWithRouter(<App />);
-      expect(screen.getByText('SnapReceipt')).toBeInTheDocument();
+      // SnapReceipt appears in multiple places (nav and homepage)
+      expect(screen.getAllByText('SnapReceipt').length).toBeGreaterThan(0);
     });
 
-    it('renders the subtitle', () => {
+    it('renders the tagline', () => {
       renderWithRouter(<App />);
-      expect(screen.getByText('Upload receipts and track your spending')).toBeInTheDocument();
+      expect(screen.getByText('Smart receipt tracking, powered by AI')).toBeInTheDocument();
     });
 
     it('renders the Upload Receipt card', () => {
       renderWithRouter(<App />);
       expect(screen.getByText('Upload Receipt')).toBeInTheDocument();
-      expect(screen.getByText(/Take a photo or upload an image/i)).toBeInTheDocument();
+      // This text appears multiple times, so use getAllByText
+      expect(screen.getAllByText(/Take a photo or upload an image/i).length).toBeGreaterThan(0);
     });
 
     it('renders the View Receipts card', () => {
@@ -40,15 +42,6 @@ describe('App', () => {
       renderWithRouter(<App />);
       // There are multiple 'Analytics' elements (nav + card), so check for the description
       expect(screen.getByText(/View spending trends and category breakdowns/i)).toBeInTheDocument();
-    });
-
-    it('renders the features section', () => {
-      renderWithRouter(<App />);
-      expect(screen.getByText('What you can do')).toBeInTheDocument();
-      expect(screen.getByText('Auto text extraction')).toBeInTheDocument();
-      expect(screen.getByText('Item detection')).toBeInTheDocument();
-      expect(screen.getByText('Search & filter')).toBeInTheDocument();
-      expect(screen.getByText('Spending insights')).toBeInTheDocument();
     });
 
     it('has correct links for quick action cards', () => {
@@ -70,14 +63,15 @@ describe('App', () => {
   describe('Navigation', () => {
     it('renders the navigation bar', () => {
       renderWithRouter(<App />);
-      expect(screen.getByText('SnapReceipt')).toBeInTheDocument();
+      // Check the navigation is present with its aria-label
+      expect(screen.getByRole('navigation', { name: /main navigation/i })).toBeInTheDocument();
     });
 
     it('renders nav links', () => {
       renderWithRouter(<App />);
-      expect(screen.getByRole('link', { name: /^home$/i })).toBeInTheDocument();
       expect(screen.getByRole('link', { name: /^upload$/i })).toBeInTheDocument();
       expect(screen.getByRole('link', { name: /^receipts$/i })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: /^analytics$/i })).toBeInTheDocument();
     });
 
     it('shows login and signup when not authenticated', () => {
