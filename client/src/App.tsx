@@ -153,20 +153,53 @@ const Home = () => {
         <div className="absolute w-32 h-32 rounded-full top-40 right-16 bg-purple-400/20 blur-2xl animate-pulse" style={{ animationDelay: '1s' }} />
         <div className="absolute w-24 h-24 rounded-full bottom-10 left-1/4 bg-emerald-400/20 blur-2xl animate-pulse" style={{ animationDelay: '2s' }} />
 
-        {/* Floating receipt icons */}
-        <div className="hidden lg:block absolute top-24 left-[15%] opacity-20">
-          <svg className="w-12 h-12 text-blue-600 animate-bounce" style={{ animationDuration: '3s' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        {/* Floating icons - varied and scattered */}
+        {/* Receipt icon - top left */}
+        <div className="hidden lg:block absolute top-20 left-[10%] opacity-15">
+          <svg className="w-14 h-14 text-blue-600 animate-[float_6s_ease-in-out_infinite]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
           </svg>
         </div>
-        <div className="hidden lg:block absolute top-32 right-[12%] opacity-20">
-          <svg className="w-10 h-10 text-purple-600 animate-bounce" style={{ animationDuration: '4s', animationDelay: '0.5s' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        {/* Shopping cart - top right */}
+        <div className="hidden lg:block absolute top-16 right-[8%] opacity-15">
+          <svg className="w-12 h-12 text-emerald-600 animate-[float_5s_ease-in-out_infinite_0.5s]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+          </svg>
+        </div>
+        {/* Chart icon - middle left */}
+        <div className="hidden lg:block absolute top-48 left-[5%] opacity-10">
+          <svg className="w-10 h-10 text-purple-600 animate-[float_7s_ease-in-out_infinite_1s]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
           </svg>
         </div>
-        <div className="hidden lg:block absolute bottom-20 right-[20%] opacity-20">
-          <svg className="w-8 h-8 text-emerald-600 animate-bounce" style={{ animationDuration: '3.5s', animationDelay: '1s' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        {/* Tag/price icon - right side */}
+        <div className="hidden lg:block absolute top-36 right-[15%] opacity-15">
+          <svg className="w-9 h-9 text-pink-500 animate-[float_5.5s_ease-in-out_infinite_0.3s]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+          </svg>
+        </div>
+        {/* Dollar/coin icon - bottom right */}
+        <div className="hidden lg:block absolute bottom-32 right-[12%] opacity-15">
+          <svg className="w-11 h-11 text-amber-500 animate-[float_6.5s_ease-in-out_infinite_0.8s]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+        {/* Barcode icon - bottom left */}
+        <div className="hidden lg:block absolute bottom-24 left-[12%] opacity-10">
+          <svg className="w-10 h-10 text-indigo-500 animate-[float_5s_ease-in-out_infinite_1.2s]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+          </svg>
+        </div>
+        {/* Calculator icon - middle right edge */}
+        <div className="hidden xl:block absolute top-64 right-[3%] opacity-10">
+          <svg className="w-8 h-8 text-teal-500 animate-[float_6s_ease-in-out_infinite_0.6s]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+          </svg>
+        </div>
+        {/* Wallet icon - left edge middle-bottom */}
+        <div className="hidden xl:block absolute bottom-48 left-[3%] opacity-10">
+          <svg className="w-9 h-9 text-rose-400 animate-[float_7s_ease-in-out_infinite_1.5s]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
           </svg>
         </div>
 

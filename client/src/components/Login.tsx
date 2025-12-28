@@ -216,7 +216,7 @@ const Login: React.FC = () => {
                 to="/register"
                 className="font-semibold text-blue-600 hover:text-blue-700"
               >
-                Sign up for free
+                Sign Up
               </Link>
             </p>
           </div>

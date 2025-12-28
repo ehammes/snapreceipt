@@ -109,7 +109,7 @@ const Register: React.FC = () => {
 
           {/* Heading */}
           <h1 className="mb-2 text-3xl font-bold text-gray-900">
-            Create your free account
+            Create your account
           </h1>
           <p className="mb-8 text-gray-500">
             Start tracking your receipts in seconds
