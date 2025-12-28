@@ -16,7 +16,6 @@ const PORT = process.env.PORT || 3001;
 const uploadsDir = path.join(__dirname, '..', 'uploads');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
-  console.log('Created uploads directory');
 }
 
 // CORS configuration

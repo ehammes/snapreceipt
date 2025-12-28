@@ -57,8 +57,6 @@ function mergeDuplicateItems(items: Array<{
       key = `${normalizedName}|${item.unitPrice.toFixed(2)}`;
     }
 
-    console.log(`[MERGE DEBUG] Item: "${item.name}" (${item.itemNumber || 'no-id'}) | Price: ${item.unitPrice} | Order: ${item.order} | Key: "${key}"`);
-
     if (itemMap.has(key)) {
       // Duplicate found - increment quantity and accumulate total
       const existing = itemMap.get(key)!;
@@ -68,7 +66,6 @@ function mergeDuplicateItems(items: Array<{
       existing.unitPrice = Math.round((existing.totalPrice / existing.quantity) * 100) / 100;
       // Keep the earliest order (first occurrence on receipt)
       existing.order = Math.min(existing.order, item.order);
-      console.log(`[MERGE DEBUG] -> MERGED! New qty: ${existing.quantity}, total: $${existing.totalPrice}, avg unit: $${existing.unitPrice}`);
     } else {
       // New unique item - add to map
       // Keep original name casing from first occurrence
@@ -80,7 +77,6 @@ function mergeDuplicateItems(items: Array<{
         itemNumber: item.itemNumber,
         order: item.order,
       });
-      console.log(`[MERGE DEBUG] -> NEW unique item added`);
     }
   }
 
@@ -126,13 +122,11 @@ class OCRService {
         // Production: credentials passed as JSON string
         const credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS_JSON);
         this.visionClient = new ImageAnnotatorClient({ credentials });
-        console.log('Google Vision API client initialized with JSON credentials');
       } else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
         // Local development: credentials from file
         this.visionClient = new ImageAnnotatorClient({
           keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS,
         });
-        console.log('Google Vision API client initialized with file credentials');
       } else {
         throw new Error('No Google credentials configured');
       }
@@ -147,8 +141,6 @@ class OCRService {
    */
   async extractText(imageBuffer: Buffer): Promise<string> {
     try {
-      console.log('Extracting text from image...');
-
       const [result] = await this.visionClient.textDetection({
         image: { content: imageBuffer },
       });
@@ -156,14 +148,10 @@ class OCRService {
       const textAnnotations = result.textAnnotations;
 
       if (!textAnnotations || textAnnotations.length === 0) {
-        console.log('No text found in image');
         return '';
       }
 
-      const fullText = textAnnotations[0].description || '';
-      console.log(`Extracted ${fullText.length} characters from image`);
-
-      return fullText;
+      return textAnnotations[0].description || '';
     } catch (error) {
       console.error('Vision API error:', error);
       throw new Error('Failed to extract text from receipt');
@@ -174,11 +162,6 @@ class OCRService {
    * Parse Costco-specific receipt text format
    */
   parseReceiptText(text: string): ParsedReceiptData {
-    console.log('Parsing receipt text...');
-    console.log('--- RAW OCR TEXT ---');
-    console.log(text);
-    console.log('--- END RAW TEXT ---');
-
     const result: ParsedReceiptData = {
       storeName: 'Costco',
       storeLocation: '',
@@ -192,7 +175,6 @@ class OCRService {
     };
 
     if (!text || text.trim().length === 0) {
-      console.log('Empty text provided for parsing');
       return result;
     }
 
@@ -201,7 +183,6 @@ class OCRService {
     // Extract store name
     if (/COSTCO\s*WHOLESALE/i.test(text)) {
       result.storeName = 'Costco Wholesale';
-      console.log('Found store name: Costco Wholesale');
     }
 
     // Extract store address - look for pattern with street number and ZIP
@@ -216,7 +197,6 @@ class OCRService {
     // Extract total amount
     this.extractTotal(text, result);
 
-    console.log(`Parsing complete: ${result.items.length} items found, total: $${result.totalAmount}`);
     return result;
   }
 
@@ -247,7 +227,6 @@ class OCRService {
         result.storeCity = fullMatch[2].trim();
         result.storeState = fullMatch[3].toUpperCase();
         result.storeZip = fullMatch[4];
-        console.log(`Found address: ${result.storeLocation}, ${result.storeCity}, ${result.storeState} ${result.storeZip}`);
         return;
       }
 
@@ -261,7 +240,6 @@ class OCRService {
           result.storeCity = cityMatch[1].trim();
           result.storeState = cityMatch[2].toUpperCase();
           result.storeZip = cityMatch[3];
-          console.log(`Found address: ${result.storeLocation}, ${result.storeCity}, ${result.storeState} ${result.storeZip}`);
           return;
         }
       }
@@ -273,7 +251,6 @@ class OCRService {
       result.storeCity = zipMatch[1].trim();
       result.storeState = zipMatch[2].toUpperCase();
       result.storeZip = zipMatch[3];
-      console.log(`Found partial address: ${result.storeCity}, ${result.storeState} ${result.storeZip}`);
     }
   }
 
@@ -302,7 +279,6 @@ class OCRService {
         const parsedDate = new Date(year, month, day);
         if (!isNaN(parsedDate.getTime())) {
           result.purchaseDate = parsedDate;
-          console.log(`Found purchase date: ${parsedDate.toLocaleDateString()}`);
           return;
         }
       }
@@ -401,9 +377,7 @@ class OCRService {
       // Apply each discount to the first price
       for (const discountInfo of pendingDiscounts) {
         const firstPrice = prices[0];
-        const originalPrice = firstPrice.price;
         firstPrice.price = Math.round((firstPrice.price - discountInfo.discount) * 100) / 100;
-        console.log(`Applied pending discount: $${originalPrice} - $${discountInfo.discount} = $${firstPrice.price}`);
       }
       pendingDiscounts.length = 0;
     };
@@ -419,7 +393,6 @@ class OCRService {
       // In Costco receipts, items and prices appear in the same order
       // (left column = items, right column = prices, both top to bottom)
       if (pendingItems.length === pendingPrices.length) {
-        console.log(`Matching ${pendingItems.length} items with ${pendingPrices.length} prices (FIFO order)`);
         for (let k = 0; k < pendingItems.length; k++) {
           const item = pendingItems[k];
           const priceInfo = pendingPrices[k];
@@ -431,7 +404,6 @@ class OCRService {
             totalPrice: priceInfo.price,
             order: item.order,
           });
-          console.log(`Found item (FIFO match): [${item.itemNumber}] ${item.name} = $${priceInfo.price} (order: ${item.order})`);
         }
         pendingItems.length = 0;
         pendingPrices.length = 0;
@@ -448,7 +420,6 @@ class OCRService {
             totalPrice: priceInfo.price,
             order: item.order,
           });
-          console.log(`Found item (FIFO match): [${item.itemNumber}] ${item.name} = $${priceInfo.price} (order: ${item.order})`);
         }
       }
     };
@@ -479,7 +450,6 @@ class OCRService {
 
       // Check if this is a line to skip but keep pending item
       if (skipButKeepPendingPatterns.some(pattern => pattern.test(line))) {
-        console.log(`Skipping line (keeping pending): ${line}`);
         continue;
       }
 
@@ -499,7 +469,6 @@ class OCRService {
           if (pendingItems.length > 0) {
             // Add to pending prices buffer
             pendingPrices.push({ price, order: i });
-            console.log(`Buffered price: $${price} (pending items: ${pendingItems.length}, pending prices: ${pendingPrices.length})`);
 
             // If we have only 1 pending item, match immediately (no multi-column ambiguity)
             if (pendingItems.length === 1 && pendingPrices.length === 1) {
@@ -508,7 +477,6 @@ class OCRService {
           } else {
             // No pending item - save as orphan price for potential later use
             orphanPrice = { price, order: i };
-            console.log(`Orphan price saved: $${price} (order: ${i})`);
           }
         }
         continue;
@@ -526,21 +494,17 @@ class OCRService {
         // If we have pending prices, apply discount to first pending price
         if (pendingPrices.length > 0) {
           const firstPrice = pendingPrices[0];
-          const originalPrice = firstPrice.price;
           firstPrice.price = Math.round((firstPrice.price - discount) * 100) / 100;
-          console.log(`Applied discount to pending price: $${originalPrice} - $${discount} = $${firstPrice.price}`);
         }
         // If items are pending but no prices yet, buffer the discount
         else if (pendingItems.length > 0) {
           pendingDiscounts.push({ discount, order: i });
-          console.log(`Buffered discount: $${discount} (pending items: ${pendingItems.length})`);
         }
         // If we have raw items, apply to last item (original behavior)
         else if (rawItems.length > 0) {
           const lastItem = rawItems[rawItems.length - 1];
           lastItem.totalPrice = Math.round((lastItem.totalPrice - discount) * 100) / 100;
           lastItem.unitPrice = lastItem.totalPrice / lastItem.quantity;
-          console.log(`Applied discount: -$${discount} to ${lastItem.name}`);
         }
         continue;
       }
@@ -559,7 +523,6 @@ class OCRService {
             totalPrice: orphanPrice.price,
             order: item.order,
           });
-          console.log(`Found item (using orphan price before inline): [${item.itemNumber}] ${item.name} = $${orphanPrice.price} (order: ${item.order})`);
           orphanPrice = null;
         }
 
@@ -576,7 +539,6 @@ class OCRService {
             totalPrice: price,
             order: i,  // Use current line number as order
           });
-          console.log(`Found item (inline): [${itemNumber}] ${name} = $${price} (order: ${i})`);
         }
         continue;
       }
@@ -596,7 +558,6 @@ class OCRService {
         if (name.length >= 2) {
           // Add to pending items queue
           pendingItems.push({ itemNumber, name, order: i });
-          console.log(`Queued item: [${itemNumber}] ${name} (order: ${i})`);
         }
         continue;
       }
@@ -618,19 +579,11 @@ class OCRService {
         totalPrice: orphanPrice.price,
         order: item.order,
       });
-      console.log(`Found item (end, using orphan price): [${item.itemNumber}] ${item.name} = $${orphanPrice.price} (order: ${item.order})`);
       orphanPrice = null;
     }
 
-    // Log any items that couldn't be matched with prices
-    for (const item of pendingItems) {
-      console.log(`Warning: Item without price: [${item.itemNumber}] ${item.name}`);
-    }
-
     // Merge duplicate items (same name + same price)
-    console.log(`OCR extracted ${rawItems.length} raw items`);
     const mergedItems = mergeDuplicateItems(rawItems);
-    console.log(`After merging: ${mergedItems.length} unique items`);
 
     // Assign merged items to result
     result.items = mergedItems;
@@ -697,7 +650,6 @@ class OCRService {
         // The actual total is the largest value (total > subtotal > tax)
         if (priceValues.length > 0) {
           result.totalAmount = Math.max(...priceValues);
-          console.log(`Found total values after TOTAL marker: [${priceValues.join(', ')}], using largest: $${result.totalAmount}`);
           return;
         }
       }
@@ -713,7 +665,6 @@ class OCRService {
       const match = text.match(pattern);
       if (match) {
         result.totalAmount = parseFloat(match[1]);
-        console.log(`Found total: $${result.totalAmount}`);
         return;
       }
     }
@@ -722,7 +673,6 @@ class OCRService {
     if (result.items.length > 0) {
       result.totalAmount = result.items.reduce((sum, item) => sum + item.totalPrice, 0);
       result.totalAmount = Math.round(result.totalAmount * 100) / 100;
-      console.log(`Calculated total from items: $${result.totalAmount}`);
     }
   }
 
@@ -731,19 +681,13 @@ class OCRService {
    */
   async processReceipt(imageBuffer: Buffer): Promise<ParsedReceiptData> {
     try {
-      console.log('Processing receipt image...');
-
       const text = await this.extractText(imageBuffer);
 
       if (!text) {
-        console.log('No text extracted, returning default structure');
         return this.getDefaultReceiptData();
       }
 
-      const parsedData = this.parseReceiptText(text);
-
-      console.log('Receipt processing complete');
-      return parsedData;
+      return this.parseReceiptText(text);
     } catch (error) {
       console.error('Error processing receipt:', error);
       return this.getDefaultReceiptData();

@@ -78,11 +78,8 @@ const Home = () => {
         headers: { 'Authorization': `Bearer ${token}` },
       });
 
-      console.log('Fetch response status:', response.status);
-
       if (response.ok) {
         const data = await response.json();
-        console.log('API response:', data);
 
         // Handle both array response and nested data response
         const receipts: Receipt[] = Array.isArray(data) ? data : (data.receipts || data.data || []);
@@ -112,7 +109,6 @@ const Home = () => {
           monthlyReceipts: monthlyReceipts.length,
           recentReceipts: sortedReceipts.slice(0, 3),
         };
-        console.log('Calculated stats:', newStats);
         setStats(newStats);
         setFetchSuccess(true);
       } else if (response.status === 401) {
