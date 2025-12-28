@@ -256,16 +256,30 @@ const ReceiptUpload: React.FC = () => {
     }
   };
 
-  // Handle cancel from review modal
-  const handleCancelReview = () => {
-    // Get receipt ID to navigate to detail page (receipt is already saved)
+  // Handle cancel from review modal - delete receipt and reset
+  const handleCancelReview = async () => {
     const receiptId = (reviewData as ReviewData & { receiptId?: string })?.receiptId;
+
+    // If receipt was already created, delete it
     if (receiptId) {
-      navigate(`/receipts/${receiptId}`);
-    } else {
-      setShowReviewModal(false);
-      clearSelection();
+      try {
+        const token = localStorage.getItem('token');
+        if (token) {
+          await fetch(`${API_BASE_URL}/api/receipts/${receiptId}`, {
+            method: 'DELETE',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+            },
+          });
+        }
+      } catch (error) {
+        console.error('Error deleting cancelled receipt:', error);
+      }
     }
+
+    // Reset all state
+    setShowReviewModal(false);
+    clearSelection();
   };
 
   // Clear selection and reset state
