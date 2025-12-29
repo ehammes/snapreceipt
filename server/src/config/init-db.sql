@@ -33,8 +33,12 @@ CREATE TABLE IF NOT EXISTS items (
     quantity INTEGER NOT NULL,
     total_price DECIMAL(10,2) NOT NULL,
     category VARCHAR(100),
-    item_order INTEGER DEFAULT 0
+    item_order INTEGER DEFAULT 0,
+    item_number VARCHAR(50)
 );
+
+-- Add item_number column if table already exists without it
+ALTER TABLE items ADD COLUMN IF NOT EXISTS item_number VARCHAR(50);
 
 -- Create indexes for better query performance
 CREATE INDEX IF NOT EXISTS idx_receipts_user_id ON receipts(user_id);

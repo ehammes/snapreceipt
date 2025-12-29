@@ -66,8 +66,14 @@ export const initializeDatabase = async (): Promise<void> => {
         quantity INTEGER NOT NULL,
         total_price DECIMAL(10,2) NOT NULL,
         category VARCHAR(100),
-        item_order INTEGER DEFAULT 0
+        item_order INTEGER DEFAULT 0,
+        item_number VARCHAR(50)
       )
+    `);
+
+    // Add item_number column if table already exists without it
+    await client.query(`
+      ALTER TABLE items ADD COLUMN IF NOT EXISTS item_number VARCHAR(50)
     `);
 
     await client.query('CREATE INDEX IF NOT EXISTS idx_receipts_user_id ON receipts(user_id)');
