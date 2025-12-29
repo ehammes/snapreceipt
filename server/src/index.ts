@@ -6,6 +6,7 @@ import dotenv from 'dotenv';
 import authRoutes from './routes/auth';
 import receiptsRoutes from './routes/receipts';
 import analyticsRoutes from './routes/analytics';
+import { initializeDatabase } from './config/database';
 
 dotenv.config();
 
@@ -54,9 +55,16 @@ app.get('/api/health', (_req: Request, res: Response) => {
   res.json({ status: 'ok', message: 'SnapReceipt API is running' });
 });
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
+// Initialize database and start server
+initializeDatabase()
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`Server is running on port ${PORT}`);
+    });
+  })
+  .catch((error) => {
+    console.error('Failed to initialize database:', error);
+    process.exit(1);
+  });
 
 export default app;
