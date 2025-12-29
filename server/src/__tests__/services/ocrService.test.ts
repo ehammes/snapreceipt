@@ -1,4 +1,5 @@
-import { ocrService } from '../../services/ocrService';
+// Set mock credentials before importing ocrService
+process.env.GOOGLE_CREDENTIALS_JSON = JSON.stringify({ type: 'service_account', project_id: 'test' });
 
 // Mock Google Vision API
 jest.mock('@google-cloud/vision', () => ({
@@ -6,6 +7,8 @@ jest.mock('@google-cloud/vision', () => ({
     textDetection: jest.fn(),
   })),
 }));
+
+import { ocrService } from '../../services/ocrService';
 
 describe('OCRService', () => {
   describe('parseReceiptText', () => {
@@ -257,7 +260,7 @@ Member 12345`;
     it('should handle empty or invalid text gracefully', () => {
       let result = ocrService.parseReceiptText('');
       expect(result.items).toEqual([]);
-      expect(result.storeName).toBe('Costco');
+      expect(result.storeName).toBe('');
 
       result = ocrService.parseReceiptText('   ');
       expect(result.items).toEqual([]);

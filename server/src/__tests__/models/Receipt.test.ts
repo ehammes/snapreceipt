@@ -23,7 +23,7 @@ describe('ReceiptModel', () => {
         upload_date: new Date(),
         purchase_date: new Date('2024-01-15'),
         total_amount: 150.99,
-        store_name: 'Costco',
+        store_name: 'Test Store',
         store_location: '123 Main St',
         store_city: 'San Francisco',
         store_state: 'CA',
@@ -37,7 +37,7 @@ describe('ReceiptModel', () => {
         image_url: '/uploads/test.jpg',
         purchase_date: new Date('2024-01-15'),
         total_amount: 150.99,
-        store_name: 'Costco',
+        store_name: 'Test Store',
         store_location: '123 Main St',
         store_city: 'San Francisco',
         store_state: 'CA',
@@ -48,7 +48,7 @@ describe('ReceiptModel', () => {
 
       expect(mockQuery).toHaveBeenCalledTimes(1);
       expect(result).toEqual(mockReceipt);
-      expect(result.store_name).toBe('Costco');
+      expect(result.store_name).toBe('Test Store');
       expect(result.total_amount).toBe(150.99);
     });
 
@@ -91,7 +91,7 @@ describe('ReceiptModel', () => {
           upload_date: new Date('2024-01-20'),
           purchase_date: new Date('2024-01-20'),
           total_amount: 100,
-          store_name: 'Costco',
+          store_name: 'Test Store',
           store_location: null,
           store_city: null,
           store_state: null,
@@ -104,7 +104,7 @@ describe('ReceiptModel', () => {
           upload_date: new Date('2024-01-15'),
           purchase_date: new Date('2024-01-15'),
           total_amount: 200,
-          store_name: 'Costco',
+          store_name: 'Test Store',
           store_location: null,
           store_city: null,
           store_state: null,
@@ -142,7 +142,7 @@ describe('ReceiptModel', () => {
         upload_date: new Date(),
         purchase_date: new Date(),
         total_amount: 99.99,
-        store_name: 'Costco',
+        store_name: 'Test Store',
         store_location: null,
         store_city: null,
         store_state: null,
@@ -186,7 +186,7 @@ describe('ReceiptModel', () => {
         upload_date: new Date(),
         purchase_date: new Date('2024-02-01'),
         total_amount: 200.00,
-        store_name: 'Costco Updated',
+        store_name: 'Test Store Updated',
         store_location: null,
         store_city: null,
         store_state: null,
@@ -197,12 +197,12 @@ describe('ReceiptModel', () => {
 
       const result = await ReceiptModel.update('123', 'user-1', {
         total_amount: 200.00,
-        store_name: 'Costco Updated',
+        store_name: 'Test Store Updated',
       });
 
       expect(mockQuery).toHaveBeenCalledTimes(1);
       expect(result?.total_amount).toBe(200.00);
-      expect(result?.store_name).toBe('Costco Updated');
+      expect(result?.store_name).toBe('Test Store Updated');
     });
 
     it('should return existing receipt when no fields to update', async () => {
@@ -213,7 +213,7 @@ describe('ReceiptModel', () => {
         upload_date: new Date(),
         purchase_date: new Date(),
         total_amount: 100,
-        store_name: 'Costco',
+        store_name: 'Test Store',
         store_location: null,
         store_city: null,
         store_state: null,

@@ -1,8 +1,8 @@
 import { ImageAnnotatorClient } from '@google-cloud/vision';
 
 /**
- * Merge duplicate items that appear on separate lines in Costco receipts.
- * Costco lists each quantity as a separate line, so 2 of the same item
+ * Merge duplicate items that appear on separate lines in receipts.
+ * Some stores list each quantity as a separate line, so 2 of the same item
  * appears as 2 separate lines with qty 1 each.
  * This function merges them into 1 item with qty 2.
  * Preserves the original order based on first occurrence on receipt.
@@ -159,11 +159,11 @@ class OCRService {
   }
 
   /**
-   * Parse Costco-specific receipt text format
+   * Parse receipt text format
    */
   parseReceiptText(text: string): ParsedReceiptData {
     const result: ParsedReceiptData = {
-      storeName: 'Costco',
+      storeName: '',
       storeLocation: '',
       storeCity: '',
       storeState: '',
@@ -180,9 +180,17 @@ class OCRService {
 
     const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
 
-    // Extract store name
+    // Extract store name - detect common stores
     if (/COSTCO\s*WHOLESALE/i.test(text)) {
       result.storeName = 'Costco Wholesale';
+    } else if (/WALMART/i.test(text)) {
+      result.storeName = 'Walmart';
+    } else if (/TARGET/i.test(text)) {
+      result.storeName = 'Target';
+    } else if (/SAFEWAY/i.test(text)) {
+      result.storeName = 'Safeway';
+    } else if (/KROGER/i.test(text)) {
+      result.storeName = 'Kroger';
     }
 
     // Extract store address - look for pattern with street number and ZIP
@@ -191,7 +199,7 @@ class OCRService {
     // Extract purchase date - look for MM/DD/YYYY or MM/DD/YY format
     this.extractDate(text, result);
 
-    // Extract items - Costco items typically have item number and price
+    // Extract items - items typically have item number and price
     this.extractItems(lines, result);
 
     // Extract total amount
@@ -287,7 +295,7 @@ class OCRService {
 
   /**
    * Extract items from receipt lines
-   * Costco format: Item number + name on one line, price on the NEXT line
+   * Format: Item number + name on one line, price on the NEXT line
    * Example:
    *   1954841 IRIS BIN
    *   11.99 A
@@ -390,7 +398,7 @@ class OCRService {
       applyPendingDiscounts(pendingPrices);
 
       // When we have equal counts, match in same order (FIFO)
-      // In Costco receipts, items and prices appear in the same order
+      // Items and prices typically appear in the same order
       // (left column = items, right column = prices, both top to bottom)
       if (pendingItems.length === pendingPrices.length) {
         for (let k = 0; k < pendingItems.length; k++) {
@@ -625,7 +633,7 @@ class OCRService {
     const lines = text.split('\n').map(l => l.trim());
 
     // PRIORITY 1: Look for FIRST **** TOTAL followed by amount
-    // In Costco receipts, after **** TOTAL we may see:
+    // After **** TOTAL we may see:
     //   - Masked card number (XXXX5089)
     //   - Random item prices from multi-column OCR (59.99 A)
     //   - Subtotal, Tax, Total values as standalone numbers (427.03, 25.39, 452.42)
@@ -699,7 +707,7 @@ class OCRService {
    */
   private getDefaultReceiptData(): ParsedReceiptData {
     return {
-      storeName: 'Costco',
+      storeName: '',
       storeLocation: '',
       storeCity: '',
       storeState: '',

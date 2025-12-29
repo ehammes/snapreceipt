@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CATEGORIES_WITH_ALL } from '../constants/categories';
 import { API_BASE_URL } from '../config/api';
@@ -63,11 +63,7 @@ const ReceiptGallery: React.FC = () => {
   const [deleting, setDeleting] = useState(false);
   const [deleteSuccess, setDeleteSuccess] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchReceipts();
-  }, []);
-
-  const fetchReceipts = async () => {
+  const fetchReceipts = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
       if (!token) {
@@ -98,7 +94,11 @@ const ReceiptGallery: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [navigate]);
+
+  useEffect(() => {
+    fetchReceipts();
+  }, [fetchReceipts]);
 
   // Check if any filters are active
   const hasActiveFilters = useMemo(() => {

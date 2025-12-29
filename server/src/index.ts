@@ -51,7 +51,7 @@ app.use('/api/analytics', analyticsRoutes);
 
 // Health check route
 app.get('/api/health', (_req: Request, res: Response) => {
-  res.json({ status: 'ok', message: 'Costco Receipt Tracker API is running' });
+  res.json({ status: 'ok', message: 'SnapReceipt API is running' });
 });
 
 // Start server

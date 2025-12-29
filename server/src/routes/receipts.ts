@@ -56,7 +56,7 @@ router.post('/upload', upload.single('receipt'), optionalAuth, async (req: Reque
         console.error('OCR processing failed:', ocrError);
         // Use default empty structure on OCR failure
         ocrData = {
-          storeName: 'Costco',
+          storeName: '',
           storeLocation: '',
           storeCity: '',
           storeState: '',
@@ -389,7 +389,7 @@ router.post('/save-guest', authenticate, async (req: Request, res: Response): Pr
       image_url: imageUrl || '',
       purchase_date: purchaseDate ? new Date(purchaseDate) : new Date(),
       total_amount: totalAmount || 0,
-      store_name: storeName || 'Costco',
+      store_name: storeName || '',
       store_location: storeLocation || '',
       store_city: storeCity || '',
       store_state: storeState || '',

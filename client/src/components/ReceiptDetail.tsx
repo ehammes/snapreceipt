@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { CATEGORIES } from '../constants/categories';
 import { API_BASE_URL } from '../config/api';
@@ -97,13 +97,7 @@ const ReceiptDetail: React.FC = () => {
   const [itemSortBy, setItemSortBy] = useState<'receipt' | 'totalPrice'>('receipt');
   const [itemSortOrder, setItemSortOrder] = useState<'asc' | 'desc'>('asc');
 
-  useEffect(() => {
-    if (id) {
-      fetchReceipt();
-    }
-  }, [id]);
-
-  const fetchReceipt = async () => {
+  const fetchReceipt = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
       if (!token) {
@@ -149,7 +143,13 @@ const ReceiptDetail: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id, navigate]);
+
+  useEffect(() => {
+    if (id) {
+      fetchReceipt();
+    }
+  }, [id, fetchReceipt]);
 
   const handleSaveStoreInfo = async () => {
     if (!receipt) return;
