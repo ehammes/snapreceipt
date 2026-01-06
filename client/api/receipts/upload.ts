@@ -1,0 +1,91 @@
+import type { VercelRequest, VercelResponse } from '@vercel/node';
+import pool from '../lib/db';
+import { verifyToken } from '../lib/auth';
+import { processReceipt } from '../lib/ocr';
+
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: '10mb',
+    },
+  },
+};
+
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  res.setHeader('Access-Control-Allow-Origin', process.env.FRONTEND_URL || '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+  try {
+    const userId = verifyToken(req);
+
+    // Handle base64 image upload
+    const { image, imageUrl } = req.body;
+
+    if (!image) {
+      return res.status(400).json({ error: 'No receipt image provided' });
+    }
+
+    // Decode base64 image
+    const base64Data = image.replace(/^data:image\/\w+;base64,/, '');
+    const imageBuffer = Buffer.from(base64Data, 'base64');
+
+    // Process with OCR
+    let ocrData;
+    try {
+      ocrData = await processReceipt(imageBuffer);
+    } catch (ocrError) {
+      console.error('OCR processing failed:', ocrError);
+      ocrData = {
+        storeName: '', storeLocation: '', storeCity: '', storeState: '', storeZip: '',
+        purchaseDate: new Date(), totalAmount: 0, items: [],
+      };
+    }
+
+    // If not authenticated, return guest mode response
+    if (!userId) {
+      return res.json({
+        success: true,
+        guestMode: true,
+        data: { ...ocrData, imageUrl: imageUrl || '' },
+        message: 'Receipt processed! Create an account to save.',
+      });
+    }
+
+    // Create receipt in database
+    const receiptResult = await pool.query(
+      `INSERT INTO receipts (user_id, image_url, purchase_date, total_amount, store_name, store_location, store_city, store_state, store_zip)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+      [userId, imageUrl || '', ocrData.purchaseDate, ocrData.totalAmount, ocrData.storeName,
+       ocrData.storeLocation, ocrData.storeCity, ocrData.storeState, ocrData.storeZip]
+    );
+    const receipt = receiptResult.rows[0];
+
+    // Save items
+    let savedItems: any[] = [];
+    if (ocrData.items.length > 0) {
+      const itemValues = ocrData.items.map((item, index) =>
+        `('${receipt.id}', '${item.name.replace(/'/g, "''")}', ${item.unitPrice}, ${item.quantity}, ${item.totalPrice}, NULL, ${item.item_order ?? index}, ${item.itemNumber ? `'${item.itemNumber}'` : 'NULL'})`
+      ).join(', ');
+
+      const itemsResult = await pool.query(
+        `INSERT INTO items (receipt_id, name, unit_price, quantity, total_price, category, item_order, item_number)
+         VALUES ${itemValues} RETURNING *`
+      );
+      savedItems = itemsResult.rows;
+    }
+
+    return res.status(201).json({
+      success: true,
+      receiptId: receipt.id,
+      imageUrl: imageUrl || '',
+      data: { ...receipt, items: savedItems },
+    });
+  } catch (error) {
+    console.error('Upload error:', error);
+    return res.status(500).json({ error: 'Failed to process receipt' });
+  }
+}
