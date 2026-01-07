@@ -68,22 +68,29 @@ export const authApi = {
   },
 };
 
+// Helper to convert file to base64
+const fileToBase64 = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = (error) => reject(error);
+  });
+};
+
 // Receipt endpoints
 export const receiptsApi = {
   upload: async (file: File) => {
-    const formData = new FormData();
-    formData.append('receipt', file);
-
     const token = localStorage.getItem('token');
-    const headers: HeadersInit = {};
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
+    const base64Image = await fileToBase64(file);
 
-    const response = await fetch(`${API_BASE_URL}/receipts/upload`, {
+    const response = await fetch(`${API_BASE_URL}/api/receipts/upload`, {
       method: 'POST',
-      headers,
-      body: formData,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token && { 'Authorization': `Bearer ${token}` }),
+      },
+      body: JSON.stringify({ image: base64Image }),
     });
     return handleResponse(response);
   },

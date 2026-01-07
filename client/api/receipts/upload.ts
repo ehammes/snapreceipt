@@ -23,6 +23,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const userId = verifyToken(req);
 
     // Handle base64 image upload
+    if (!req.body) {
+      return res.status(400).json({ error: 'Request body is missing' });
+    }
     const { image, imageUrl } = req.body;
 
     if (!image) {

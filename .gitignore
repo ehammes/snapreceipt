@@ -28,3 +28,5 @@ uploads/
 # Google Cloud credentials
 *-service-account*.json
 credentials*.json
+.vercel
+.env*.local

@@ -111,6 +111,16 @@ const ReceiptUpload: React.FC = () => {
     };
   };
 
+  // Convert file to base64
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = (error) => reject(error);
+    });
+  };
+
   // Handle upload and processing
   const handleUpload = async () => {
     if (!file) return;
@@ -119,22 +129,23 @@ const ReceiptUpload: React.FC = () => {
     setProcessing(true);
 
     try {
-      const formData = new FormData();
-      formData.append('receipt', file);
-
       const token = localStorage.getItem('token');
       if (!token) {
         navigate('/login');
         return;
       }
 
+      // Convert file to base64
+      const base64Image = await fileToBase64(file);
+
       // Upload for processing only (don't save yet)
       const response = await fetch(`${API_BASE_URL}/api/receipts/upload`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
         },
-        body: formData,
+        body: JSON.stringify({ image: base64Image }),
       });
 
       const data = await response.json();
