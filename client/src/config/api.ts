@@ -4,9 +4,9 @@ export const API_BASE_URL = process.env.REACT_APP_API_URL || '';
 
 // API Endpoints
 export const API_ENDPOINTS = {
-  // Auth
-  LOGIN: `${API_BASE_URL}/api/auth/login`,
-  REGISTER: `${API_BASE_URL}/api/auth/register`,
+  // Auth (consolidated: use ?action=login or ?action=register)
+  LOGIN: `${API_BASE_URL}/api/auth?action=login`,
+  REGISTER: `${API_BASE_URL}/api/auth?action=register`,
 
   // Receipts
   RECEIPTS: `${API_BASE_URL}/api/receipts`,
@@ -16,10 +16,10 @@ export const API_ENDPOINTS = {
   UPLOAD: `${API_BASE_URL}/api/receipts/upload`,
   SAVE_GUEST: `${API_BASE_URL}/api/receipts/save-guest`,
 
-  // Analytics
-  ANALYTICS_SUMMARY: `${API_BASE_URL}/api/analytics/summary`,
-  ANALYTICS_SUMMARY_METRICS: `${API_BASE_URL}/api/analytics/summary-metrics`,
-  ANALYTICS_CATEGORY: `${API_BASE_URL}/api/analytics/category-breakdown`,
-  ANALYTICS_MONTHLY: `${API_BASE_URL}/api/analytics/spending-timeline`,
-  ANALYTICS_TOP_ITEMS: `${API_BASE_URL}/api/analytics/top-items`,
+  // Analytics (consolidated: use ?type=)
+  ANALYTICS_SUMMARY: `${API_BASE_URL}/api/analytics?type=summary`,
+  ANALYTICS_SUMMARY_METRICS: `${API_BASE_URL}/api/analytics?type=summary-metrics`,
+  ANALYTICS_CATEGORY: `${API_BASE_URL}/api/analytics?type=category-breakdown`,
+  ANALYTICS_MONTHLY: `${API_BASE_URL}/api/analytics?type=spending-timeline`,
+  ANALYTICS_TOP_ITEMS: `${API_BASE_URL}/api/analytics?type=top-items`,
 };
