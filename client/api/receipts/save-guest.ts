@@ -37,16 +37,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     );
     const receipt = receiptResult.rows[0];
 
-    // Save items
+    // Save items using parameterized queries
     if (items && items.length > 0) {
-      const itemValues = items.map((item: any, index: number) =>
-        `('${receipt.id}', '${(item.name || '').replace(/'/g, "''")}', ${item.unitPrice || 0}, ${item.quantity || 1}, ${item.totalPrice || 0}, ${item.category ? `'${item.category}'` : 'NULL'}, ${item.item_order ?? index}, ${item.itemNumber ? `'${item.itemNumber}'` : 'NULL'})`
-      ).join(', ');
-
-      await pool.query(
-        `INSERT INTO items (receipt_id, name, unit_price, quantity, total_price, category, item_order, item_number)
-         VALUES ${itemValues}`
-      );
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        await pool.query(
+          `INSERT INTO items (receipt_id, name, unit_price, quantity, total_price, category, item_order, item_number)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          [receipt.id, item.name || '', item.unitPrice || 0, item.quantity || 1, item.totalPrice || 0, item.category || null, item.item_order ?? i, item.itemNumber || null]
+        );
+      }
     }
 
     return res.status(201).json({

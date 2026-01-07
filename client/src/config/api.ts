@@ -11,8 +11,8 @@ export const API_ENDPOINTS = {
   // Receipts
   RECEIPTS: `${API_BASE_URL}/api/receipts`,
   RECEIPT: (id: string) => `${API_BASE_URL}/api/receipts/${id}`,
-  RECEIPT_ITEMS: (receiptId: string) => `${API_BASE_URL}/api/receipts/${receiptId}/items`,
-  RECEIPT_ITEM: (receiptId: string, itemId: string) => `${API_BASE_URL}/api/receipts/${receiptId}/items/${itemId}`,
+  RECEIPT_ITEMS: (receiptId: string) => `${API_BASE_URL}/api/items?receiptId=${receiptId}`,
+  RECEIPT_ITEM: (receiptId: string, itemId: string) => `${API_BASE_URL}/api/items/${itemId}?receiptId=${receiptId}`,
   UPLOAD: `${API_BASE_URL}/api/receipts/upload`,
   SAVE_GUEST: `${API_BASE_URL}/api/receipts/save-guest`,
 

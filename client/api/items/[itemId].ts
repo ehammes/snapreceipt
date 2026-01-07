@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import pool from '../../../lib/db';
-import { verifyToken } from '../../../lib/auth';
+import pool from '../lib/db';
+import { verifyToken } from '../lib/auth';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', process.env.FRONTEND_URL || '*');
@@ -12,7 +12,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const userId = verifyToken(req);
   if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
-  const { id, itemId } = req.query;
+  const { receiptId, itemId } = req.query;
+  const id = receiptId;
 
   try {
     // Verify receipt ownership
