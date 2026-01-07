@@ -37,6 +37,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (req.method === 'PATCH') {
+      if (!req.body) {
+        return res.status(400).json({ error: 'Request body is missing' });
+      }
       const { storeName, storeLocation, storeCity, storeState, storeZip, purchaseDate, totalAmount } = req.body;
 
       // Verify ownership
