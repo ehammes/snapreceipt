@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { API_BASE_URL } from '../config/api';
+import { API_ENDPOINTS } from '../config/api';
 
 const Register: React.FC = () => {
   const navigate = useNavigate();
@@ -38,7 +38,7 @@ const Register: React.FC = () => {
 
     try {
       // Register the user
-      const registerRes = await fetch(`${API_BASE_URL}/api/auth/register`, {
+      const registerRes = await fetch(API_ENDPOINTS.REGISTER, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
