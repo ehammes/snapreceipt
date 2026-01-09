@@ -536,18 +536,18 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
           </div>
 
           {/* Footer */}
-          <div className="flex flex-col-reverse sm:flex-row gap-3 p-4 sm:p-6 border-t border-gray-200 bg-gray-50 rounded-b-xl">
+          <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 p-4 sm:p-6 border-t border-gray-200 bg-gray-50 rounded-b-xl">
             <button
               onClick={onCancel}
               disabled={saving}
-              className="flex-1 sm:flex-none px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-medium transition-colors disabled:opacity-50"
+              className="px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-medium transition-colors disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               onClick={() => onSave(formData)}
               disabled={saving}
-              className="flex-1 sm:flex-none px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {saving ? (
                 <>
