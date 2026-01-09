@@ -593,7 +593,7 @@ const ReceiptDetail: React.FC = () => {
               {receipt.image_url ? (
                 <>
                   <img
-                    src={`${API_BASE_URL}${receipt.image_url}`}
+                    src={receipt.image_url.startsWith('data:') ? receipt.image_url : `${API_BASE_URL}${receipt.image_url}`}
                     alt={`Receipt from ${receipt.store_name || 'Store'} dated ${new Date(receipt.purchase_date).toLocaleDateString()}`}
                     className="w-full rounded-lg cursor-zoom-in"
                     onClick={() => setImageZoomed(true)}
@@ -1108,7 +1108,7 @@ const ReceiptDetail: React.FC = () => {
           aria-label="Zoomed receipt image"
         >
           <img
-            src={`${API_BASE_URL}${receipt.image_url}`}
+            src={receipt.image_url.startsWith('data:') ? receipt.image_url : `${API_BASE_URL}${receipt.image_url}`}
             alt={`Zoomed receipt from ${receipt.store_name || 'Store'}`}
             className="max-w-full max-h-full object-contain"
           />

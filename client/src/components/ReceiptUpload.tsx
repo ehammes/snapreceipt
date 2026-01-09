@@ -145,7 +145,7 @@ const ReceiptUpload: React.FC = () => {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ image: base64Image }),
+        body: JSON.stringify({ image: base64Image, imageUrl: base64Image }),
       });
 
       const data = await response.json();
@@ -239,7 +239,7 @@ const ReceiptUpload: React.FC = () => {
         for (const item of data.items) {
           // Only update items that have a server ID (not newly added items with client IDs)
           if (item.id && !item.id.startsWith('new-') && !item.id.startsWith('item-')) {
-            await fetch(`${API_BASE_URL}/api/receipts/${receiptId}/items/${item.id}`, {
+            await fetch(`${API_BASE_URL}/api/items/${item.id}?receiptId=${receiptId}`, {
               method: 'PUT',
               headers: {
                 'Authorization': `Bearer ${token}`,

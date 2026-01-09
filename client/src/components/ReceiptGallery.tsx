@@ -701,7 +701,7 @@ const ReceiptGallery: React.FC = () => {
                 <div className="aspect-[3/4] bg-gray-100 overflow-hidden">
                   {receipt.image_url ? (
                     <img
-                      src={`${API_BASE_URL}${receipt.image_url}`}
+                      src={receipt.image_url.startsWith('data:') ? receipt.image_url : `${API_BASE_URL}${receipt.image_url}`}
                       alt={`Receipt from ${receipt.store_name}`}
                       className="w-full h-full object-cover transition-transform duration-200 hover:scale-105"
                     />

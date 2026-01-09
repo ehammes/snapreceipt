@@ -39,6 +39,7 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
   const [formData, setFormData] = useState<ReviewData>(data);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [addingItem, setAddingItem] = useState(false);
+  const [imageZoomed, setImageZoomed] = useState(false);
   const [newItem, setNewItem] = useState<Omit<ReviewItem, 'id'>>({
     itemNumber: '',
     name: '',
@@ -155,7 +156,7 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
   return (
     <div className="fixed inset-0 bg-black/50 z-50 overflow-y-auto">
       <div className="min-h-screen px-4 py-6 flex items-start justify-center">
-        <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl">
+        <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl">
           {/* Header */}
           <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200">
             <h2 className="text-xl sm:text-2xl font-bold text-gray-800">Review Receipt</h2>
@@ -171,8 +172,28 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
           </div>
 
           {/* Content */}
-          <div className="p-4 sm:p-6 space-y-6 max-h-[calc(100vh-200px)] overflow-y-auto">
-            {/* Store Information */}
+          <div className="max-h-[calc(100vh-200px)] overflow-y-auto">
+            <div className={`p-4 sm:p-6 ${formData.imageUrl ? 'lg:flex lg:gap-6' : ''}`}>
+              {/* Receipt Image - Left Column on Desktop */}
+              {formData.imageUrl && (
+                <div className="lg:w-1/3 lg:flex-shrink-0 mb-6 lg:mb-0">
+                  <div className="lg:sticky lg:top-0">
+                    <div className="bg-gray-50 rounded-lg p-3">
+                      <img
+                        src={formData.imageUrl}
+                        alt="Receipt"
+                        className="w-full rounded-lg shadow-md object-contain cursor-zoom-in hover:opacity-90 transition-opacity"
+                        onClick={() => setImageZoomed(true)}
+                      />
+                      <p className="text-xs text-gray-400 text-center mt-2">Click to zoom</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Form Fields - Right Column on Desktop */}
+              <div className={`${formData.imageUrl ? 'lg:flex-1' : 'w-full'} space-y-6`}>
+                {/* Store Information */}
             <div className="bg-gray-50 rounded-lg p-4">
               <h3 className="font-semibold text-gray-800 mb-4">Store Information</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -510,6 +531,8 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
                 </button>
               )}
             </div>
+              </div>{/* End Form Fields */}
+            </div>{/* End Flex Container */}
           </div>
 
           {/* Footer */}
@@ -541,6 +564,28 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Image Zoom Modal */}
+      {imageZoomed && formData.imageUrl && (
+        <div
+          className="fixed inset-0 z-[60] bg-black bg-opacity-90 flex items-center justify-center p-4 cursor-zoom-out"
+          onClick={() => setImageZoomed(false)}
+        >
+          <img
+            src={formData.imageUrl}
+            alt="Zoomed receipt"
+            className="max-w-full max-h-full object-contain"
+          />
+          <button
+            className="absolute top-4 right-4 text-white hover:text-gray-300"
+            onClick={() => setImageZoomed(false)}
+          >
+            <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      )}
     </div>
   );
 };

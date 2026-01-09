@@ -233,10 +233,10 @@ const AnalyticsDashboard: React.FC = () => {
       const headers = { Authorization: `Bearer ${token}` };
 
       const [timelineRes, topItemsRes, categoriesRes, metricsRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/api/analytics/spending-timeline`, { headers }),
-        fetch(`${API_BASE_URL}/api/analytics/top-items?limit=10`, { headers }),
-        fetch(`${API_BASE_URL}/api/analytics/category-breakdown`, { headers }),
-        fetch(`${API_BASE_URL}/api/analytics/summary-metrics`, { headers }),
+        fetch(`${API_BASE_URL}/api/analytics?type=spending-timeline`, { headers }),
+        fetch(`${API_BASE_URL}/api/analytics?type=top-items&limit=10`, { headers }),
+        fetch(`${API_BASE_URL}/api/analytics?type=category-breakdown`, { headers }),
+        fetch(`${API_BASE_URL}/api/analytics?type=summary-metrics`, { headers }),
       ]);
 
       if (!timelineRes.ok || !topItemsRes.ok || !categoriesRes.ok || !metricsRes.ok) {
