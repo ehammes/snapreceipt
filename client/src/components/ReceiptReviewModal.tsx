@@ -156,7 +156,7 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
   return (
     <div className="fixed inset-0 bg-black/50 z-50 overflow-y-auto">
       <div className="min-h-screen px-4 py-6 flex items-start justify-center">
-        <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl">
+        <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl">
           {/* Header */}
           <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200">
             <h2 className="text-xl sm:text-2xl font-bold text-gray-800">Review Receipt</h2>
