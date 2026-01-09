@@ -143,6 +143,59 @@ export function parseReceiptText(text: string): ParsedReceiptData {
   else if (/TARGET/i.test(text)) result.storeName = 'Target';
   else if (/SAFEWAY/i.test(text)) result.storeName = 'Safeway';
   else if (/KROGER/i.test(text)) result.storeName = 'Kroger';
+  else if (/TRADER\s*JOE/i.test(text)) result.storeName = "Trader Joe's";
+  else if (/WHOLE\s*FOODS/i.test(text)) result.storeName = 'Whole Foods';
+  else if (/ALDI/i.test(text)) result.storeName = 'Aldi';
+
+  // Extract address - look for street address pattern in first 15 lines
+  const addressLines = lines.slice(0, 15);
+
+  // Look for street address (number + street name)
+  const streetPattern = /^(\d+\s+(?:[NSEW]\.?\s+)?(?:[A-Za-z]+\s*)+(?:ST|STREET|AVE|AVENUE|BLVD|BOULEVARD|RD|ROAD|DR|DRIVE|LN|LANE|WAY|CT|COURT|PL|PLACE|PKWY|PARKWAY|HWY|HIGHWAY)\.?)$/i;
+  for (const line of addressLines) {
+    const streetMatch = line.match(streetPattern);
+    if (streetMatch) {
+      result.storeLocation = streetMatch[1].trim();
+      break;
+    }
+  }
+
+  // Look for City, State ZIP pattern
+  const cityStateZipPattern = /^([A-Za-z\s]+),?\s*([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/;
+  for (const line of addressLines) {
+    const match = line.match(cityStateZipPattern);
+    if (match) {
+      result.storeCity = match[1].trim();
+      result.storeState = match[2];
+      result.storeZip = match[3];
+      break;
+    }
+  }
+
+  // Alternative: Look for just City, State (no ZIP on same line)
+  if (!result.storeCity) {
+    const cityStatePattern = /^([A-Za-z\s]+),\s*([A-Z]{2})$/;
+    for (const line of addressLines) {
+      const match = line.match(cityStatePattern);
+      if (match) {
+        result.storeCity = match[1].trim();
+        result.storeState = match[2];
+        break;
+      }
+    }
+  }
+
+  // Look for standalone ZIP code if not found
+  if (!result.storeZip) {
+    const zipPattern = /^(\d{5}(?:-\d{4})?)$/;
+    for (const line of addressLines) {
+      const match = line.match(zipPattern);
+      if (match) {
+        result.storeZip = match[1];
+        break;
+      }
+    }
+  }
 
   // Extract date
   const datePatterns = [
