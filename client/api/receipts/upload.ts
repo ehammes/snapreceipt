@@ -48,12 +48,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       };
     }
 
+    // Use image as imageUrl if imageUrl is not provided (to avoid duplicate payload)
+    const storedImageUrl = imageUrl || image;
+
     // If not authenticated, return guest mode response
     if (!userId) {
       return res.json({
         success: true,
         guestMode: true,
-        data: { ...ocrData, imageUrl: imageUrl || '' },
+        data: { ...ocrData, imageUrl: storedImageUrl },
         message: 'Receipt processed! Create an account to save.',
       });
     }
@@ -62,7 +65,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const receiptResult = await pool.query(
       `INSERT INTO receipts (user_id, image_url, purchase_date, total_amount, store_name, store_location, store_city, store_state, store_zip)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
-      [userId, imageUrl || '', ocrData.purchaseDate, ocrData.totalAmount, ocrData.storeName,
+      [userId, storedImageUrl, ocrData.purchaseDate, ocrData.totalAmount, ocrData.storeName,
        ocrData.storeLocation, ocrData.storeCity, ocrData.storeState, ocrData.storeZip]
     );
     const receipt = receiptResult.rows[0];
