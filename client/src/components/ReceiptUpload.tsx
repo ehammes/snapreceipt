@@ -133,6 +133,14 @@ const ReceiptUpload: React.FC = () => {
     });
   };
 
+  // Validate file size before upload (account for base64 overhead)
+  const validateFileSize = (file: File): boolean => {
+    // Base64 encoding increases size by ~33%, and we want to stay under 10MB request limit
+    // So the raw file should be under ~7MB to be safe
+    const maxSizeBytes = 7 * 1024 * 1024; // 7 MB
+    return file.size <= maxSizeBytes;
+  };
+
   // Clear error state
   const clearError = () => {
     setUploadError(null);
@@ -163,6 +171,18 @@ const ReceiptUpload: React.FC = () => {
         return;
       }
 
+      // Validate file size before encoding
+      if (!validateFileSize(file)) {
+        setUploadError({
+          type: 'server',
+          message: 'Image file is too large (max 7 MB). Please try a smaller image or compress it.',
+          canRetry: false,
+        });
+        setUploading(false);
+        setProcessing(false);
+        return;
+      }
+
       // Convert file to base64
       const base64Image = await fileToBase64(file);
 
@@ -178,7 +198,7 @@ const ReceiptUpload: React.FC = () => {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ image: base64Image, imageUrl: base64Image }),
+          body: JSON.stringify({ image: base64Image, imageUrl: '' }),
           signal: controller.signal,
         });
       } catch (fetchError: any) {
