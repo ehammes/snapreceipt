@@ -26,6 +26,14 @@ interface ProcessedReceipt {
   imageUrl: string;
 }
 
+type ErrorType = 'ocr' | 'network' | 'auth' | 'server' | null;
+
+interface UploadError {
+  type: ErrorType;
+  message: string;
+  canRetry: boolean;
+}
+
 const ReceiptUpload: React.FC = () => {
   const navigate = useNavigate();
 
@@ -38,6 +46,8 @@ const ReceiptUpload: React.FC = () => {
   const [reviewData, setReviewData] = useState<ReviewData | null>(null);
   const [saving, setSaving] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [uploadError, setUploadError] = useState<UploadError | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   // Refs for file inputs
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -58,6 +68,8 @@ const ReceiptUpload: React.FC = () => {
     setPreviewUrl(URL.createObjectURL(selectedFile));
     setShowReviewModal(false);
     setReviewData(null);
+    setUploadError(null);
+    setRetryCount(0);
   };
 
   // Handle file input change
@@ -121,43 +133,125 @@ const ReceiptUpload: React.FC = () => {
     });
   };
 
+  // Clear error state
+  const clearError = () => {
+    setUploadError(null);
+    setRetryCount(0);
+  };
+
   // Handle upload and processing
-  const handleUpload = async () => {
+  const handleUpload = async (isRetry = false) => {
     if (!file) return;
 
+    if (!isRetry) {
+      setRetryCount(0);
+    }
+    setUploadError(null);
     setUploading(true);
     setProcessing(true);
 
     try {
       const token = localStorage.getItem('token');
       if (!token) {
-        navigate('/login');
+        setUploadError({
+          type: 'auth',
+          message: 'Your session has expired. Please log in again to continue.',
+          canRetry: false,
+        });
+        setUploading(false);
+        setProcessing(false);
         return;
       }
 
       // Convert file to base64
       const base64Image = await fileToBase64(file);
 
-      // Upload for processing only (don't save yet)
-      const response = await fetch(`${API_BASE_URL}/api/receipts/upload`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ image: base64Image, imageUrl: base64Image }),
-      });
+      // Upload for processing with timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout
 
-      const data = await response.json();
+      let response: Response;
+      try {
+        response = await fetch(`${API_BASE_URL}/api/receipts/upload`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ image: base64Image, imageUrl: base64Image }),
+          signal: controller.signal,
+        });
+      } catch (fetchError: any) {
+        clearTimeout(timeoutId);
+        // Network or timeout error
+        if (fetchError.name === 'AbortError') {
+          setUploadError({
+            type: 'network',
+            message: 'Processing is taking too long. Please try again with a clearer image.',
+            canRetry: true,
+          });
+        } else {
+          setUploadError({
+            type: 'network',
+            message: 'Unable to connect. Please check your internet connection and try again.',
+            canRetry: true,
+          });
+        }
+        return;
+      }
+      clearTimeout(timeoutId);
 
+      // Handle HTTP errors
       if (!response.ok) {
         if (response.status === 401) {
           localStorage.removeItem('token');
-          navigate('/login');
+          setUploadError({
+            type: 'auth',
+            message: 'Your session has expired. Please log in again to continue.',
+            canRetry: false,
+          });
           return;
         }
-        throw new Error(data.error || 'Failed to process receipt');
+        if (response.status === 413) {
+          setUploadError({
+            type: 'server',
+            message: 'Image file is too large. Please try a smaller image or compress it.',
+            canRetry: false,
+          });
+          return;
+        }
+        if (response.status >= 500) {
+          setUploadError({
+            type: 'server',
+            message: 'Our servers are having trouble. Please try again in a moment.',
+            canRetry: true,
+          });
+          return;
+        }
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to process receipt');
       }
+
+      // Parse JSON response with error handling
+      let data;
+      try {
+        data = await response.json();
+      } catch (jsonError) {
+        console.error('Failed to parse response as JSON:', jsonError);
+        setUploadError({
+          type: 'server',
+          message: 'Received an invalid response from the server. Please try again.',
+          canRetry: true,
+        });
+        return;
+      }
+
+      // Check for OCR failure (empty or poor results)
+      const items = data.data?.items || [];
+      const storeName = data.data?.store_name || data.data?.storeName || '';
+      const totalAmount = data.data?.total_amount || data.data?.totalAmount || 0;
+
+      const isOcrPoor = items.length === 0 && !storeName && totalAmount === 0;
 
       // Convert the response data to review format
       const processedData: ProcessedReceipt = {
@@ -167,9 +261,9 @@ const ReceiptUpload: React.FC = () => {
         storeState: data.data?.store_state || data.data?.storeState || '',
         storeZip: data.data?.store_zip || data.data?.storeZip || '',
         purchaseDate: data.data?.purchase_date || data.data?.purchaseDate || new Date().toISOString(),
-        totalAmount: data.data?.total_amount || data.data?.totalAmount || 0,
+        totalAmount: totalAmount,
         imageUrl: data.data?.image_url || data.imageUrl || '',
-        items: (data.data?.items || []).map((item: any) => ({
+        items: items.map((item: any) => ({
           id: item.id?.toString(),
           name: item.name,
           unitPrice: parseFloat(item.unit_price) || item.unitPrice || 0,
@@ -183,6 +277,15 @@ const ReceiptUpload: React.FC = () => {
       // Store the receipt ID for later use when saving edits
       const receiptId = data.receiptId;
 
+      // If OCR results are poor, show warning but still allow manual entry
+      if (isOcrPoor) {
+        setUploadError({
+          type: 'ocr',
+          message: "We couldn't read this receipt clearly. You can still enter the details manually below.",
+          canRetry: true,
+        });
+      }
+
       setReviewData({
         ...convertToReviewData(processedData),
         receiptId,
@@ -191,11 +294,38 @@ const ReceiptUpload: React.FC = () => {
 
     } catch (error) {
       console.error('Upload error:', error);
-      alert(error instanceof Error ? error.message : 'Failed to upload receipt');
+      setUploadError({
+        type: 'server',
+        message: error instanceof Error ? error.message : 'Something went wrong. Please try again.',
+        canRetry: true,
+      });
     } finally {
       setUploading(false);
       setProcessing(false);
     }
+  };
+
+  // Handle retry
+  const handleRetry = () => {
+    if (retryCount < 2) {
+      setRetryCount(prev => prev + 1);
+      handleUpload(true);
+    } else {
+      setUploadError({
+        type: uploadError?.type || 'server',
+        message: 'Multiple attempts failed. Please try a different image or try again later.',
+        canRetry: false,
+      });
+    }
+  };
+
+  // Handle login redirect
+  const handleLoginRedirect = () => {
+    // Store the current file in sessionStorage before redirecting
+    if (previewUrl) {
+      sessionStorage.setItem('pendingReceiptImage', previewUrl);
+    }
+    navigate('/login');
   };
 
   // Handle save from review modal
@@ -301,6 +431,8 @@ const ReceiptUpload: React.FC = () => {
     setReviewData(null);
     setUploading(false);
     setProcessing(false);
+    setUploadError(null);
+    setRetryCount(0);
 
     // Clear file input values
     if (fileInputRef.current) {
@@ -309,6 +441,91 @@ const ReceiptUpload: React.FC = () => {
     if (cameraInputRef.current) {
       cameraInputRef.current.value = '';
     }
+  };
+
+  // Render error alert
+  const renderErrorAlert = () => {
+    if (!uploadError) return null;
+
+    const isWarning = uploadError.type === 'ocr';
+    const bgColor = isWarning ? 'bg-amber-50' : 'bg-red-50';
+    const borderColor = isWarning ? 'border-amber-200' : 'border-red-200';
+    const textColor = isWarning ? 'text-amber-800' : 'text-red-800';
+    const iconColor = isWarning ? 'text-amber-500' : 'text-red-500';
+
+    return (
+      <div className={`${bgColor} ${borderColor} border rounded-xl p-4 mb-4`}>
+        <div className="flex items-start gap-3">
+          {/* Icon */}
+          <div className={`flex-shrink-0 ${iconColor}`}>
+            {isWarning ? (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            ) : (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            )}
+          </div>
+
+          {/* Message and actions */}
+          <div className="flex-1">
+            <p className={`text-sm font-medium ${textColor}`}>
+              {uploadError.message}
+            </p>
+
+            {/* Action buttons */}
+            <div className="mt-3 flex gap-2">
+              {uploadError.type === 'auth' ? (
+                <button
+                  onClick={handleLoginRedirect}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+                  </svg>
+                  Log In
+                </button>
+              ) : uploadError.canRetry && retryCount < 2 ? (
+                <button
+                  onClick={handleRetry}
+                  disabled={uploading}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Try Again {retryCount > 0 && `(${2 - retryCount} left)`}
+                </button>
+              ) : null}
+
+              {/* Dismiss button - not for OCR warnings that still show modal */}
+              {uploadError.type !== 'ocr' && (
+                <button
+                  onClick={clearError}
+                  className="inline-flex items-center px-3 py-1.5 text-gray-500 hover:text-gray-700 text-sm font-medium transition-colors"
+                >
+                  Dismiss
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Close button for OCR warnings */}
+          {uploadError.type === 'ocr' && (
+            <button
+              onClick={clearError}
+              className="flex-shrink-0 text-amber-400 hover:text-amber-600 transition-colors"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
+        </div>
+      </div>
+    );
   };
 
   // Render upload options (no file selected)
@@ -461,6 +678,9 @@ const ReceiptUpload: React.FC = () => {
   // Render preview and upload UI
   const renderPreview = () => (
     <div className="space-y-4">
+      {/* Error Alert */}
+      {renderErrorAlert()}
+
       {/* Image Preview */}
       <div className="relative bg-gray-900 rounded-xl overflow-hidden">
         <img
@@ -490,7 +710,7 @@ const ReceiptUpload: React.FC = () => {
           Choose Different
         </button>
         <button
-          onClick={handleUpload}
+          onClick={() => handleUpload()}
           disabled={uploading}
           className="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white py-3 px-6 rounded-xl font-medium transition-all shadow-md hover:shadow-lg disabled:opacity-50 flex items-center justify-center gap-2"
         >
