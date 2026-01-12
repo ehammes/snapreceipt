@@ -229,58 +229,51 @@ export function parseReceiptText(text: string): ParsedReceiptData {
   const itemWithPriceRegex = /^(?:[A-Z]\s+)?([$]?\d{4,7}[A-Z]?)\s+(.+?)\s+(\d+\.\d{2})\s*([A-Z])?\s*$/i;
   const discountLineRegex = /^(\d+(?:\.\d{2})?)-([A-Z])?\s*$/;
 
-  const pendingItems: Array<{ itemNumber: string; name: string; order: number }> = [];
-  const pendingPrices: Array<{ price: number; order: number }> = [];
+  const unmatchedItems: Array<{ itemNumber: string; name: string; order: number; matched: boolean }> = [];
   const rawItems: Array<ParsedItem & { order: number }> = [];
 
-  const matchPendingItemsAndPrices = () => {
-    if (pendingItems.length === 0 || pendingPrices.length === 0) return;
-    while (pendingItems.length > 0 && pendingPrices.length > 0) {
-      const item = pendingItems.shift()!;
-      const priceInfo = pendingPrices.shift()!;
-      rawItems.push({
-        itemNumber: item.itemNumber,
-        name: item.name,
-        unitPrice: priceInfo.price,
-        quantity: 1,
-        totalPrice: priceInfo.price,
-        order: item.order,
-      });
+  // Proximity-based matching: find closest unmatched item above the price
+  const matchPriceToItem = (price: number, priceLineOrder: number) => {
+    // Look backward from the price line to find the nearest unmatched item
+    let bestMatch: typeof unmatchedItems[0] | null = null;
+    let minDistance = Infinity;
+
+    for (const item of unmatchedItems) {
+      if (item.matched) continue;
+
+      // Price should be after or on the same line as the item
+      const distance = priceLineOrder - item.order;
+      if (distance >= 0 && distance < minDistance) {
+        minDistance = distance;
+        bestMatch = item;
+      }
     }
+
+    if (bestMatch) {
+      bestMatch.matched = true;
+      rawItems.push({
+        itemNumber: bestMatch.itemNumber,
+        name: bestMatch.name,
+        unitPrice: price,
+        quantity: 1,
+        totalPrice: price,
+        order: bestMatch.order,
+      });
+      return true;
+    }
+    return false;
   };
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
     if (!line || line.length < 2) continue;
     if (skipPatterns.some(pattern => pattern.test(line))) {
-      matchPendingItemsAndPrices();
-      pendingItems.length = 0;
-      pendingPrices.length = 0;
+      // Clear unmatched items when we hit skip patterns (section boundaries)
+      unmatchedItems.length = 0;
       continue;
     }
 
-    const priceMatch = line.match(priceLineRegex);
-    if (priceMatch) {
-      const price = parseFloat(priceMatch[1]);
-      if (price >= 0.01 && price < 10000 && pendingItems.length > 0) {
-        pendingPrices.push({ price, order: i });
-        if (pendingItems.length === 1 && pendingPrices.length === 1) {
-          matchPendingItemsAndPrices();
-        }
-      }
-      continue;
-    }
-
-    const discountMatch = line.match(discountLineRegex);
-    if (discountMatch && rawItems.length > 0) {
-      let discount = parseFloat(discountMatch[1]);
-      if (!discountMatch[1].includes('.')) discount = discount / 100;
-      const lastItem = rawItems[rawItems.length - 1];
-      lastItem.totalPrice = Math.round((lastItem.totalPrice - discount) * 100) / 100;
-      lastItem.unitPrice = lastItem.totalPrice / lastItem.quantity;
-      continue;
-    }
-
+    // First, try to match item+price on same line (most reliable)
     const itemWithPriceMatch = line.match(itemWithPriceRegex);
     if (itemWithPriceMatch) {
       const name = cleanItemName(itemWithPriceMatch[2]);
@@ -298,19 +291,42 @@ export function parseReceiptText(text: string): ParsedReceiptData {
       continue;
     }
 
+    // Check for standalone price - use proximity matching
+    const priceMatch = line.match(priceLineRegex);
+    if (priceMatch) {
+      const price = parseFloat(priceMatch[1]);
+      if (price >= 0.01 && price < 10000) {
+        matchPriceToItem(price, i);
+      }
+      continue;
+    }
+
+    // Check for discount line
+    const discountMatch = line.match(discountLineRegex);
+    if (discountMatch && rawItems.length > 0) {
+      let discount = parseFloat(discountMatch[1]);
+      if (!discountMatch[1].includes('.')) discount = discount / 100;
+      const lastItem = rawItems[rawItems.length - 1];
+      lastItem.totalPrice = Math.round((lastItem.totalPrice - discount) * 100) / 100;
+      lastItem.unitPrice = lastItem.totalPrice / lastItem.quantity;
+      continue;
+    }
+
+    // Item line without price - add to unmatched items
     const itemMatch = line.match(itemLineRegex);
     if (itemMatch) {
-      if (pendingPrices.length > 0 && pendingItems.length > 0) {
-        matchPendingItemsAndPrices();
-      }
       const name = cleanItemName(itemMatch[2]);
       if (name.length >= 2) {
-        pendingItems.push({ itemNumber: itemMatch[1], name, order: i });
+        unmatchedItems.push({
+          itemNumber: itemMatch[1],
+          name,
+          order: i,
+          matched: false
+        });
       }
     }
   }
 
-  matchPendingItemsAndPrices();
   result.items = mergeDuplicateItems(rawItems);
 
   // Extract total
