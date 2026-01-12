@@ -41,6 +41,7 @@ const ReceiptUpload: React.FC = () => {
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [compressing, setCompressing] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [reviewData, setReviewData] = useState<ReviewData | null>(null);
@@ -123,6 +124,60 @@ const ReceiptUpload: React.FC = () => {
     };
   };
 
+  // Compress image before upload
+  const compressImage = (file: File): Promise<File> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          // Calculate new dimensions (max 2000px on longest side)
+          const maxDimension = 2000;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > maxDimension || height > maxDimension) {
+            if (width > height) {
+              height = (height * maxDimension) / width;
+              width = maxDimension;
+            } else {
+              width = (width * maxDimension) / height;
+              height = maxDimension;
+            }
+          }
+
+          // Create canvas and compress
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+
+          // Convert to blob with compression (0.85 quality for JPEG)
+          canvas.toBlob(
+            (blob) => {
+              if (blob) {
+                const compressedFile = new File([blob], file.name, {
+                  type: 'image/jpeg',
+                  lastModified: Date.now(),
+                });
+                resolve(compressedFile);
+              } else {
+                reject(new Error('Image compression failed'));
+              }
+            },
+            'image/jpeg',
+            0.85
+          );
+        };
+        img.onerror = () => reject(new Error('Failed to load image'));
+        img.src = e.target?.result as string;
+      };
+      reader.onerror = () => reject(new Error('Failed to read file'));
+    });
+  };
+
   // Convert file to base64
   const fileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -131,14 +186,6 @@ const ReceiptUpload: React.FC = () => {
       reader.onload = () => resolve(reader.result as string);
       reader.onerror = (error) => reject(error);
     });
-  };
-
-  // Validate file size before upload (account for base64 overhead)
-  const validateFileSize = (file: File): boolean => {
-    // Base64 encoding increases size by ~33%, and we want to stay under 10MB request limit
-    // So the raw file should be under ~7MB to be safe
-    const maxSizeBytes = 7 * 1024 * 1024; // 7 MB
-    return file.size <= maxSizeBytes;
   };
 
   // Clear error state
@@ -171,20 +218,47 @@ const ReceiptUpload: React.FC = () => {
         return;
       }
 
-      // Validate file size before encoding
-      if (!validateFileSize(file)) {
+      // Compress image if needed
+      let fileToUpload = file;
+      const maxSizeBytes = 5 * 1024 * 1024; // 5 MB threshold for compression
+
+      if (file.size > maxSizeBytes) {
+        setCompressing(true);
+        try {
+          fileToUpload = await compressImage(file);
+        } catch (compressionError) {
+          console.error('Image compression failed:', compressionError);
+          setUploadError({
+            type: 'server',
+            message: 'Failed to compress image. Please try a different image.',
+            canRetry: false,
+          });
+          setUploading(false);
+          setCompressing(false);
+          setProcessing(false);
+          return;
+        } finally {
+          setCompressing(false);
+        }
+      }
+
+      // Convert file to base64
+      const base64Image = await fileToBase64(fileToUpload);
+
+      // Verify the final size isn't too large
+      const finalSizeBytes = base64Image.length;
+      const maxFinalSize = 10 * 1024 * 1024; // 10 MB final limit
+
+      if (finalSizeBytes > maxFinalSize) {
         setUploadError({
           type: 'server',
-          message: 'Image file is too large (max 7 MB). Please try a smaller image or compress it.',
+          message: 'Image is too large even after compression. Please try a smaller image.',
           canRetry: false,
         });
         setUploading(false);
         setProcessing(false);
         return;
       }
-
-      // Convert file to base64
-      const base64Image = await fileToBase64(file);
 
       // Upload for processing with timeout
       const controller = new AbortController();
@@ -450,6 +524,7 @@ const ReceiptUpload: React.FC = () => {
     setShowReviewModal(false);
     setReviewData(null);
     setUploading(false);
+    setCompressing(false);
     setProcessing(false);
     setUploadError(null);
     setRetryCount(0);
@@ -472,10 +547,13 @@ const ReceiptUpload: React.FC = () => {
     const borderColor = isWarning ? 'border-amber-200' : 'border-red-200';
     const textColor = isWarning ? 'text-amber-800' : 'text-red-800';
     const iconColor = isWarning ? 'text-amber-500' : 'text-red-500';
+    const closeButtonColor = isWarning
+      ? 'text-amber-400 hover:text-amber-600'
+      : 'text-red-400 hover:text-red-600';
 
     return (
-      <div className={`${bgColor} ${borderColor} border rounded-xl p-4 mb-4`}>
-        <div className="flex items-start gap-3">
+      <div className={`${bgColor} ${borderColor} border rounded-xl p-4 mb-4 relative`}>
+        <div className="flex items-start gap-3 pr-8">
           {/* Icon */}
           <div className={`flex-shrink-0 ${iconColor}`}>
             {isWarning ? (
@@ -496,54 +574,45 @@ const ReceiptUpload: React.FC = () => {
             </p>
 
             {/* Action buttons */}
-            <div className="mt-3 flex gap-2">
-              {uploadError.type === 'auth' ? (
-                <button
-                  onClick={handleLoginRedirect}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
-                  </svg>
-                  Log In
-                </button>
-              ) : uploadError.canRetry && retryCount < 2 ? (
-                <button
-                  onClick={handleRetry}
-                  disabled={uploading}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  Try Again {retryCount > 0 && `(${2 - retryCount} left)`}
-                </button>
-              ) : null}
-
-              {/* Dismiss button - not for OCR warnings that still show modal */}
-              {uploadError.type !== 'ocr' && (
-                <button
-                  onClick={clearError}
-                  className="inline-flex items-center px-3 py-1.5 text-gray-500 hover:text-gray-700 text-sm font-medium transition-colors"
-                >
-                  Dismiss
-                </button>
-              )}
-            </div>
+            {(uploadError.type === 'auth' || (uploadError.canRetry && retryCount < 2)) && (
+              <div className="mt-3 flex gap-2">
+                {uploadError.type === 'auth' ? (
+                  <button
+                    onClick={handleLoginRedirect}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+                    </svg>
+                    Log In
+                  </button>
+                ) : uploadError.canRetry && retryCount < 2 ? (
+                  <button
+                    onClick={handleRetry}
+                    disabled={uploading}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Try Again {retryCount > 0 && `(${2 - retryCount} left)`}
+                  </button>
+                ) : null}
+              </div>
+            )}
           </div>
-
-          {/* Close button for OCR warnings */}
-          {uploadError.type === 'ocr' && (
-            <button
-              onClick={clearError}
-              className="flex-shrink-0 text-amber-400 hover:text-amber-600 transition-colors"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          )}
         </div>
+
+        {/* Close button (top-right corner) */}
+        <button
+          onClick={clearError}
+          className={`absolute top-3 right-3 ${closeButtonColor} transition-colors p-1 rounded-lg hover:bg-white/50`}
+          aria-label="Dismiss error"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
       </div>
     );
   };
@@ -737,7 +806,7 @@ const ReceiptUpload: React.FC = () => {
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
           </svg>
-          {uploading ? 'Processing...' : 'Process Receipt'}
+          {compressing ? 'Compressing...' : uploading ? 'Processing...' : 'Process Receipt'}
         </button>
       </div>
     </div>
@@ -767,10 +836,12 @@ const ReceiptUpload: React.FC = () => {
       </div>
 
       <h2 className="text-xl font-bold text-gray-900 mb-2">
-        Processing your receipt
+        {compressing ? 'Compressing your image' : 'Processing your receipt'}
       </h2>
       <p className="text-gray-500 mb-8">
-        Our AI is extracting items, prices, and store information
+        {compressing
+          ? 'Optimizing image size for faster upload...'
+          : 'Our AI is extracting items, prices, and store information'}
       </p>
 
       {/* Progress steps */}

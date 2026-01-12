@@ -587,24 +587,34 @@ const ReceiptDetail: React.FC = () => {
         {/* Two-column layout */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Left Column - Receipt Image */}
-          <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6">
+          <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6 lg:sticky lg:top-6 lg:self-start">
             <h2 className="font-semibold text-lg text-gray-800 mb-4">Receipt Image</h2>
             <div className="relative">
               {receipt.image_url ? (
                 <>
-                  <img
-                    src={receipt.image_url.startsWith('data:') ? receipt.image_url : `${API_BASE_URL}${receipt.image_url}`}
-                    alt={`Receipt from ${receipt.store_name || 'Store'} dated ${new Date(receipt.purchase_date).toLocaleDateString()}`}
-                    className="w-full rounded-lg cursor-zoom-in"
-                    onClick={() => setImageZoomed(true)}
-                  />
-                  <p className="text-xs text-gray-400 text-center mt-2">
+                  <div className="relative overflow-hidden rounded-lg bg-gray-100">
+                    <img
+                      src={receipt.image_url.startsWith('data:') ? receipt.image_url : `${API_BASE_URL}${receipt.image_url}`}
+                      alt={`Receipt from ${receipt.store_name || 'Store'} dated ${new Date(receipt.purchase_date).toLocaleDateString()}`}
+                      className="w-full max-h-[800px] object-contain cursor-zoom-in hover:opacity-90 transition-opacity"
+                      onClick={() => setImageZoomed(true)}
+                    />
+                  </div>
+                  <p className="text-xs text-gray-400 text-center mt-2 flex items-center justify-center gap-1">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
+                    </svg>
                     Click to zoom
                   </p>
                 </>
               ) : (
                 <div className="aspect-[3/4] bg-gray-100 rounded-lg flex items-center justify-center">
-                  <p className="text-gray-400">No image available</p>
+                  <div className="text-center">
+                    <svg className="w-12 h-12 mx-auto text-gray-300 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <p className="text-gray-400 text-sm">No image available</p>
+                  </div>
                 </div>
               )}
             </div>
