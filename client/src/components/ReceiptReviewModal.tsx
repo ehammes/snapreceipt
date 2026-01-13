@@ -7,6 +7,7 @@ export interface ReviewItem {
   name: string;
   unitPrice: number;
   quantity: number;
+  discount: number;
   totalPrice: number;
   category: string;
 }
@@ -44,6 +45,7 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
     name: '',
     unitPrice: 0,
     quantity: 1,
+    discount: 0,
     totalPrice: 0,
     category: 'Groceries',
   });
@@ -73,9 +75,10 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
       items: prev.items.map(item => {
         if (item.id !== itemId) return item;
         const updated = { ...item, [field]: value };
-        // Recalculate total if unit price or quantity changes
-        if (field === 'unitPrice' || field === 'quantity') {
-          updated.totalPrice = Number(updated.unitPrice) * Number(updated.quantity);
+        // Recalculate total if unit price, quantity, or discount changes
+        if (field === 'unitPrice' || field === 'quantity' || field === 'discount') {
+          const subtotal = Number(updated.unitPrice) * Number(updated.quantity);
+          updated.totalPrice = Math.round((subtotal - (Number(updated.discount) || 0)) * 100) / 100;
         }
         return updated;
       }),
@@ -92,10 +95,11 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
 
   // Add new item
   const handleAddItem = () => {
+    const subtotal = newItem.unitPrice * newItem.quantity;
     const itemToAdd: ReviewItem = {
       ...newItem,
       id: generateId(),
-      totalPrice: newItem.unitPrice * newItem.quantity,
+      totalPrice: Math.round((subtotal - (newItem.discount || 0)) * 100) / 100,
     };
     setFormData(prev => ({
       ...prev,
@@ -106,6 +110,7 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
       name: '',
       unitPrice: 0,
       quantity: 1,
+      discount: 0,
       totalPrice: 0,
       category: 'Groceries',
     });
@@ -359,7 +364,7 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
                             />
                           </div>
                         </div>
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 items-end">
+                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 items-end">
                           <div>
                             <label className="block text-xs text-gray-500 mb-1">Unit Price</label>
                             <input
@@ -378,6 +383,18 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
                               value={item.quantity}
                               onChange={(e) => updateItem(item.id, 'quantity', parseInt(e.target.value) || 1)}
                               className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-gray-500 mb-1">Discount</label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={item.discount || 0}
+                              onChange={(e) => updateItem(item.id, 'discount', parseFloat(e.target.value) || 0)}
+                              className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
+                              placeholder="0.00"
                             />
                           </div>
                           <div>
@@ -436,7 +453,7 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
                         />
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                       <div>
                         <label className="block text-xs text-gray-500 mb-1">Unit Price *</label>
                         <input
@@ -455,6 +472,18 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
                           min="1"
                           value={newItem.quantity}
                           onChange={(e) => setNewItem(prev => ({ ...prev, quantity: parseInt(e.target.value) || 1 }))}
+                          className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Discount</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={newItem.discount || ''}
+                          onChange={(e) => setNewItem(prev => ({ ...prev, discount: parseFloat(e.target.value) || 0 }))}
+                          placeholder="0.00"
                           className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
                         />
                       </div>

@@ -227,7 +227,8 @@ export function parseReceiptText(text: string): ParsedReceiptData {
   const itemLineRegex = /^(?:[A-Z]\s+)?([$]?\d{4,7}[A-Z]?)\s+(.+)$/i;
   const priceLineRegex = /^(\d+\.\d{2})\s*([A-Z])?\s*$/;
   const itemWithPriceRegex = /^(?:[A-Z]\s+)?([$]?\d{4,7}[A-Z]?)\s+(.+?)\s+(\d+\.\d{2})\s*([A-Z])?\s*$/i;
-  const discountLineRegex = /^(\d+(?:\.\d{2})?)-([A-Z])?\s*$/;
+  // Match discounts at start of line (8.00-) or end of line (... 8.00-)
+  const discountLineRegex = /(\d+\.\d{2})-\s*$/;
 
   const unmatchedItems: Array<{ itemNumber: string; name: string; order: number; matched: boolean }> = [];
   const rawItems: Array<ParsedItem & { order: number }> = [];
@@ -259,6 +260,31 @@ export function parseReceiptText(text: string): ParsedReceiptData {
         totalPrice: price,
         order: bestMatch.order,
       });
+      return true;
+    }
+    return false;
+  };
+
+  // Proximity-based discount matching: apply discount to nearest item above
+  const applyDiscountToItem = (discount: number, discountLineOrder: number) => {
+    if (rawItems.length === 0) return false;
+
+    // Find the item with the closest order number that's before the discount line
+    let bestMatch: (typeof rawItems)[0] | null = null;
+    let minDistance = Infinity;
+
+    for (const item of rawItems) {
+      const distance = discountLineOrder - item.order;
+      // Discount should be after the item (within a reasonable range, e.g., 3 lines)
+      if (distance > 0 && distance <= 3 && distance < minDistance) {
+        minDistance = distance;
+        bestMatch = item;
+      }
+    }
+
+    if (bestMatch) {
+      bestMatch.totalPrice = Math.round((bestMatch.totalPrice - discount) * 100) / 100;
+      bestMatch.unitPrice = bestMatch.totalPrice / bestMatch.quantity;
       return true;
     }
     return false;
@@ -301,14 +327,12 @@ export function parseReceiptText(text: string): ParsedReceiptData {
       continue;
     }
 
-    // Check for discount line
+    // Check for discount line - use proximity-based matching
     const discountMatch = line.match(discountLineRegex);
     if (discountMatch && rawItems.length > 0) {
       let discount = parseFloat(discountMatch[1]);
       if (!discountMatch[1].includes('.')) discount = discount / 100;
-      const lastItem = rawItems[rawItems.length - 1];
-      lastItem.totalPrice = Math.round((lastItem.totalPrice - discount) * 100) / 100;
-      lastItem.unitPrice = lastItem.totalPrice / lastItem.quantity;
+      applyDiscountToItem(discount, i);
       continue;
     }
 

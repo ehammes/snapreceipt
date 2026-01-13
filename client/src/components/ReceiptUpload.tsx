@@ -118,6 +118,7 @@ const ReceiptUpload: React.FC = () => {
         name: item.name,
         unitPrice: item.unitPrice,
         quantity: item.quantity,
+        discount: 0,
         totalPrice: item.totalPrice,
         category: item.category || 'Groceries',
       })),
