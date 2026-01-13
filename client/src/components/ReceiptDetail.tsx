@@ -51,6 +51,8 @@ const ReceiptDetail: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [imageZoomed, setImageZoomed] = useState(false);
+  const [hoverZoom, setHoverZoom] = useState(false);
+  const [zoomPosition, setZoomPosition] = useState({ x: 0, y: 0 });
   const [editingStore, setEditingStore] = useState(false);
   const [addingItem, setAddingItem] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -592,19 +594,62 @@ const ReceiptDetail: React.FC = () => {
             <div className="relative">
               {receipt.image_url ? (
                 <>
-                  <div className="relative overflow-hidden rounded-lg bg-gray-100">
-                    <img
-                      src={receipt.image_url.startsWith('data:') ? receipt.image_url : `${API_BASE_URL}${receipt.image_url}`}
-                      alt={`Receipt from ${receipt.store_name || 'Store'} dated ${new Date(receipt.purchase_date).toLocaleDateString()}`}
-                      className="w-full max-h-[800px] object-contain cursor-zoom-in hover:opacity-90 transition-opacity"
-                      onClick={() => setImageZoomed(true)}
-                    />
+                  <div className="relative">
+                    {/* Main Image */}
+                    <div className="relative overflow-hidden rounded-lg bg-gray-100">
+                      <img
+                        src={receipt.image_url.startsWith('data:') ? receipt.image_url : `${API_BASE_URL}${receipt.image_url}`}
+                        alt={`Receipt from ${receipt.store_name || 'Store'} dated ${new Date(receipt.purchase_date).toLocaleDateString()}`}
+                        className="w-full max-h-[800px] object-contain cursor-crosshair"
+                        onClick={() => setImageZoomed(true)}
+                        onMouseEnter={() => setHoverZoom(true)}
+                        onMouseLeave={() => setHoverZoom(false)}
+                        onMouseMove={(e) => {
+                          const img = e.currentTarget;
+                          const rect = img.getBoundingClientRect();
+                          const x = ((e.clientX - rect.left) / rect.width) * 100;
+                          const y = ((e.clientY - rect.top) / rect.height) * 100;
+                          setZoomPosition({ x, y });
+                        }}
+                      />
+
+                      {/* Hover indicator box showing magnified area - desktop only */}
+                      {hoverZoom && (
+                        <div
+                          className="hidden lg:block absolute border-2 border-blue-500 bg-blue-500/10 pointer-events-none"
+                          style={{
+                            width: '33.33%',
+                            height: '33.33%',
+                            left: `${Math.max(0, Math.min(66.67, zoomPosition.x - 16.67))}%`,
+                            top: `${Math.max(0, Math.min(66.67, zoomPosition.y - 16.67))}%`,
+                          }}
+                        />
+                      )}
+                    </div>
+
+                    {/* Zoom Panel - Absolutely positioned to the right, desktop only */}
+                    {hoverZoom && (
+                      <div
+                        className="hidden lg:block absolute top-0 left-full ml-4 w-80 h-96 overflow-hidden rounded-lg bg-white border-4 border-blue-500 shadow-2xl pointer-events-none z-50"
+                      >
+                        <img
+                          src={receipt.image_url.startsWith('data:') ? receipt.image_url : `${API_BASE_URL}${receipt.image_url}`}
+                          alt="Zoomed view"
+                          className="w-full h-full object-contain"
+                          style={{
+                            transform: 'scale(3.6)',
+                            transformOrigin: `${zoomPosition.x}% ${zoomPosition.y}%`,
+                          }}
+                        />
+                      </div>
+                    )}
                   </div>
                   <p className="text-xs text-gray-400 text-center mt-2 flex items-center justify-center gap-1">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
                     </svg>
-                    Click to zoom
+                    <span className="lg:hidden">Tap to zoom</span>
+                    <span className="hidden lg:inline">Hover to magnify • Click to zoom</span>
                   </p>
                 </>
               ) : (
