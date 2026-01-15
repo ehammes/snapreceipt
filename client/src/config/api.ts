@@ -2,11 +2,14 @@
 // Uses environment variable for external API, empty string for same-domain API (Vercel)
 export const API_BASE_URL = process.env.REACT_APP_API_URL || '';
 
+// Detect if using local Express server (has REACT_APP_API_URL) or Vercel serverless (empty)
+const isLocalDev = !!process.env.REACT_APP_API_URL;
+
 // API Endpoints
 export const API_ENDPOINTS = {
-  // Auth (consolidated: use ?action=login or ?action=register)
-  LOGIN: `${API_BASE_URL}/api/auth?action=login`,
-  REGISTER: `${API_BASE_URL}/api/auth?action=register`,
+  // Auth - different patterns for local Express vs Vercel serverless
+  LOGIN: isLocalDev ? `${API_BASE_URL}/api/auth/login` : `${API_BASE_URL}/api/auth?action=login`,
+  REGISTER: isLocalDev ? `${API_BASE_URL}/api/auth/register` : `${API_BASE_URL}/api/auth?action=register`,
 
   // Receipts
   RECEIPTS: `${API_BASE_URL}/api/receipts`,

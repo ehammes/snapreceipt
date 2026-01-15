@@ -46,10 +46,11 @@ TAX
       // Check items
       expect(result.items.length).toBe(2);
 
-      // HUG PU 3T-4T: 39.99 - 8.00 = 31.99
+      // HUG PU 3T-4T: 39.99 with 8.00 discount = 31.99 total
       const hugPu = result.items.find(item => item.name.includes('HUG PU'));
       expect(hugPu).toBeDefined();
-      expect(hugPu!.unitPrice).toBe(31.99);
+      expect(hugPu!.unitPrice).toBe(39.99);
+      expect(hugPu!.discount).toBe(8.00);
       expect(hugPu!.quantity).toBe(1);
       expect(hugPu!.totalPrice).toBe(31.99);
 
@@ -152,7 +153,9 @@ Items Sold: 11`;
       // Find specific items
       const hugPu = result.items.find(item => item.name.includes('HUG PU'));
       expect(hugPu).toBeDefined();
-      expect(hugPu!.unitPrice).toBe(31.99); // 39.99 - 8.00 discount
+      expect(hugPu!.unitPrice).toBe(39.99);
+      expect(hugPu!.discount).toBe(8.00);
+      expect(hugPu!.totalPrice).toBe(31.99); // 39.99 - 8.00 discount
 
       const irisBin = result.items.find(item => item.name.includes('IRIS BIN'));
       expect(irisBin).toBeDefined();
@@ -313,15 +316,19 @@ SUBTOTAL
 
       const result = ocrService.parseReceiptText(rawText);
 
-      // HUG PU 3T-4T: 39.99 - 8.00 (800 without decimal) = 31.99
+      // HUG PU 3T-4T: 39.99 with 8.00 discount (800 without decimal) = 31.99 total
       const hugPu = result.items.find(item => item.name.includes('HUG PU'));
       expect(hugPu).toBeDefined();
-      expect(hugPu!.unitPrice).toBe(31.99);
+      expect(hugPu!.unitPrice).toBe(39.99);
+      expect(hugPu!.discount).toBe(8.00);
+      expect(hugPu!.totalPrice).toBe(31.99);
 
-      // WGNLRWRKJCKT: 34.99 - 5.00 = 29.99
+      // WGNLRWRKJCKT: 34.99 with 5.00 discount = 29.99 total
       const jacket = result.items.find(item => item.name.includes('WGNLRWRKJCKT'));
       expect(jacket).toBeDefined();
-      expect(jacket!.unitPrice).toBe(29.99);
+      expect(jacket!.unitPrice).toBe(34.99);
+      expect(jacket!.discount).toBe(5.00);
+      expect(jacket!.totalPrice).toBe(29.99);
     });
 
     it('should skip non-item lines', () => {

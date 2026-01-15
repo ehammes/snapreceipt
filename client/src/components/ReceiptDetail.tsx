@@ -8,6 +8,7 @@ interface ReceiptItem {
   name: string;
   unit_price: number;
   quantity: number;
+  discount: number;
   total_price: number;
   category: string | null;
   item_number: string | null;
@@ -40,6 +41,7 @@ interface ItemForm {
   name: string;
   unitPrice: string;
   quantity: string;
+  discount: string;
   category: string;
 }
 
@@ -69,6 +71,7 @@ const ReceiptDetail: React.FC = () => {
     name: '',
     unitPrice: '',
     quantity: '1',
+    discount: '0',
     category: 'Groceries',
   });
 
@@ -83,6 +86,7 @@ const ReceiptDetail: React.FC = () => {
     name: '',
     unitPrice: '',
     quantity: '1',
+    discount: '0',
     category: '',
   });
   const [deleteItemModalOpen, setDeleteItemModalOpen] = useState(false);
@@ -199,6 +203,7 @@ const ReceiptDetail: React.FC = () => {
           name: itemForm.name,
           unitPrice: parseFloat(itemForm.unitPrice),
           quantity: parseInt(itemForm.quantity) || 1,
+          discount: parseFloat(itemForm.discount) || 0,
           category: itemForm.category,
         }),
       });
@@ -215,6 +220,7 @@ const ReceiptDetail: React.FC = () => {
         name: '',
         unitPrice: '',
         quantity: '1',
+        discount: '0',
         category: 'Groceries',
       });
       setAddingItem(false);
@@ -305,6 +311,7 @@ const ReceiptDetail: React.FC = () => {
       name: item.name,
       unitPrice: String(item.unit_price),
       quantity: String(item.quantity),
+      discount: String(item.discount || 0),
       category: item.category || 'Groceries',
     });
   };
@@ -315,6 +322,7 @@ const ReceiptDetail: React.FC = () => {
       name: '',
       unitPrice: '',
       quantity: '1',
+      discount: '0',
       category: '',
     });
   };
@@ -337,6 +345,7 @@ const ReceiptDetail: React.FC = () => {
             name: editItemForm.name,
             unitPrice: parseFloat(editItemForm.unitPrice),
             quantity: parseInt(editItemForm.quantity) || 1,
+            discount: parseFloat(editItemForm.discount) || 0,
             category: editItemForm.category,
           }),
         }
@@ -947,7 +956,7 @@ const ReceiptDetail: React.FC = () => {
                               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                             />
                           </div>
-                          <div className="grid grid-cols-3 gap-2">
+                          <div className="grid grid-cols-4 gap-2">
                             <div>
                               <label className="block text-xs text-gray-500 mb-1">Unit Price</label>
                               <input
@@ -965,6 +974,17 @@ const ReceiptDetail: React.FC = () => {
                                 min="1"
                                 value={editItemForm.quantity}
                                 onChange={(e) => setEditItemForm({ ...editItemForm, quantity: e.target.value })}
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-gray-500 mb-1">Discount</label>
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={editItemForm.discount}
+                                onChange={(e) => setEditItemForm({ ...editItemForm, discount: e.target.value })}
                                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                               />
                             </div>
@@ -1011,13 +1031,24 @@ const ReceiptDetail: React.FC = () => {
                               <p className="font-medium text-gray-800">{item.name}</p>
                             </div>
                             <p className="text-sm text-gray-500">
-                              {formatCurrency(item.unit_price)} × {item.quantity} = {formatCurrency(item.total_price)}
+                              {formatCurrency(item.unit_price)} × {item.quantity}
+                              {item.discount > 0 && (
+                                <span className="text-red-500"> - {formatCurrency(item.discount)}</span>
+                              )}
+                              {' '}= {formatCurrency(item.total_price)}
                             </p>
-                            {item.category && (
-                              <span className="text-xs text-blue-600 mt-1 inline-block">
-                                {item.category}
-                              </span>
-                            )}
+                            <div className="flex items-center gap-2 mt-1">
+                              {item.category && (
+                                <span className="text-xs text-blue-600">
+                                  {item.category}
+                                </span>
+                              )}
+                              {item.discount > 0 && (
+                                <span className="text-xs bg-red-100 text-red-600 px-1.5 py-0.5 rounded">
+                                  Discount: {formatCurrency(item.discount)}
+                                </span>
+                              )}
+                            </div>
                           </div>
                           <div className="flex items-center gap-2">
                             <span className="font-semibold text-green-600">
@@ -1066,7 +1097,7 @@ const ReceiptDetail: React.FC = () => {
                       className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-3 gap-4">
                     <div>
                       <label className="block text-sm text-gray-600 mb-1">Unit Price</label>
                       <input
@@ -1085,6 +1116,18 @@ const ReceiptDetail: React.FC = () => {
                         min="1"
                         value={itemForm.quantity}
                         onChange={(e) => setItemForm({ ...itemForm, quantity: e.target.value })}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm text-gray-600 mb-1">Discount</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={itemForm.discount}
+                        onChange={(e) => setItemForm({ ...itemForm, discount: e.target.value })}
+                        placeholder="0.00"
                         className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       />
                     </div>
@@ -1118,6 +1161,7 @@ const ReceiptDetail: React.FC = () => {
                           name: '',
                           unitPrice: '',
                           quantity: '1',
+                          discount: '0',
                           category: 'Groceries',
                         });
                       }}

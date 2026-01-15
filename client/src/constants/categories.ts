@@ -1,10 +1,10 @@
 export const CATEGORIES = [
-  'Groceries',
   'Alcohol',
-  'Electronics',
-  'Household',
   'Clothing',
-  'Health',
+  'Electronics',
+  'Groceries',
+  'Health & Beauty',
+  'Household Supplies',
   'Other',
 ] as const;
 

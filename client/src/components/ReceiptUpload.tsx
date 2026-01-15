@@ -8,6 +8,7 @@ interface ProcessedItem {
   name: string;
   unitPrice: number;
   quantity: number;
+  discount?: number;
   totalPrice: number;
   itemNumber?: string;
   item_order?: number;
@@ -118,7 +119,7 @@ const ReceiptUpload: React.FC = () => {
         name: item.name,
         unitPrice: item.unitPrice,
         quantity: item.quantity,
-        discount: 0,
+        discount: item.discount || 0,
         totalPrice: item.totalPrice,
         category: item.category || 'Groceries',
       })),
@@ -363,6 +364,7 @@ const ReceiptUpload: React.FC = () => {
           name: item.name,
           unitPrice: parseFloat(item.unit_price) || item.unitPrice || 0,
           quantity: item.quantity || 1,
+          discount: parseFloat(item.discount) || 0,
           totalPrice: parseFloat(item.total_price) || item.totalPrice || 0,
           itemNumber: item.item_number || item.itemNumber || '',
           category: item.category || 'Groceries',
@@ -460,11 +462,11 @@ const ReceiptUpload: React.FC = () => {
           throw new Error('Failed to update receipt');
         }
 
-        // Update each item (category and other edits)
+        // Update existing items and create new items
         for (const item of data.items) {
-          // Only update items that have a server ID (not newly added items with client IDs)
           if (item.id && !item.id.startsWith('new-') && !item.id.startsWith('item-')) {
-            await fetch(`${API_BASE_URL}/api/items/${item.id}?receiptId=${receiptId}`, {
+            // Update existing items
+            await fetch(`${API_BASE_URL}/api/receipts/${receiptId}/items/${item.id}`, {
               method: 'PUT',
               headers: {
                 'Authorization': `Bearer ${token}`,
@@ -474,9 +476,24 @@ const ReceiptUpload: React.FC = () => {
                 name: item.name,
                 unitPrice: item.unitPrice,
                 quantity: item.quantity,
-                totalPrice: item.totalPrice,
+                discount: item.discount || 0,
                 category: item.category,
-                itemNumber: item.itemNumber,
+              }),
+            });
+          } else if (item.id && (item.id.startsWith('new-') || item.id.startsWith('item-'))) {
+            // Create new items added in the review modal
+            await fetch(`${API_BASE_URL}/api/receipts/${receiptId}/items`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                name: item.name,
+                unitPrice: item.unitPrice,
+                quantity: item.quantity,
+                discount: item.discount || 0,
+                category: item.category,
               }),
             });
           }

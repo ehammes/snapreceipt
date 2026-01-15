@@ -37,22 +37,25 @@ interface CategoryBreakdown {
   itemCount: number;
 }
 
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D'];
+// Professional data visualization palette - complementary colors with good contrast
+// Based on colorblind-friendly palettes used in Tableau/D3
+const CATEGORY_COLOR_MAP: Record<string, { hex: string; bg: string; text: string }> = {
+  'Groceries': { hex: '#2ecc71', bg: 'bg-emerald-100', text: 'text-emerald-700' },      // Green - fresh/food
+  'Electronics': { hex: '#3498db', bg: 'bg-sky-100', text: 'text-sky-700' },            // Blue - tech
+  'Clothing': { hex: '#9b59b6', bg: 'bg-purple-100', text: 'text-purple-700' },         // Purple - fashion
+  'Health & Beauty': { hex: '#e74c3c', bg: 'bg-red-100', text: 'text-red-700' },        // Red - health/vitality
+  'Household Supplies': { hex: '#f39c12', bg: 'bg-amber-100', text: 'text-amber-700' }, // Orange/Amber - home
+  'Alcohol': { hex: '#1abc9c', bg: 'bg-teal-100', text: 'text-teal-700' },              // Teal - beverages
+  'Other': { hex: '#95a5a6', bg: 'bg-slate-100', text: 'text-slate-600' },              // Slate - neutral
+  'Uncategorized': { hex: '#bdc3c7', bg: 'bg-gray-100', text: 'text-gray-500' },        // Light gray
+};
 
-// Category color mapping for badges
-const CATEGORY_COLORS: Record<string, string> = {
-  'Groceries': 'bg-green-100 text-green-800',
-  'Household': 'bg-blue-100 text-blue-800',
-  'Electronics': 'bg-purple-100 text-purple-800',
-  'Clothing': 'bg-pink-100 text-pink-800',
-  'Health & Beauty': 'bg-rose-100 text-rose-800',
-  'Frozen': 'bg-cyan-100 text-cyan-800',
-  'Beverages': 'bg-amber-100 text-amber-800',
-  'Snacks': 'bg-orange-100 text-orange-800',
-  'Bakery': 'bg-yellow-100 text-yellow-800',
-  'Meat & Seafood': 'bg-red-100 text-red-800',
-  'Dairy': 'bg-indigo-100 text-indigo-800',
-  'Uncategorized': 'bg-gray-100 text-gray-800',
+// Fallback colors for any categories not in the map
+const FALLBACK_COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D'];
+
+// Helper to get category color
+const getCategoryColor = (category: string) => {
+  return CATEGORY_COLOR_MAP[category] || { hex: '#6b7280', bg: 'bg-gray-100', text: 'text-gray-700' };
 };
 
 // Helper to format date
@@ -233,10 +236,10 @@ const AnalyticsDashboard: React.FC = () => {
       const headers = { Authorization: `Bearer ${token}` };
 
       const [timelineRes, topItemsRes, categoriesRes, metricsRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/api/analytics?type=spending-timeline`, { headers }),
-        fetch(`${API_BASE_URL}/api/analytics?type=top-items&limit=10`, { headers }),
-        fetch(`${API_BASE_URL}/api/analytics?type=category-breakdown`, { headers }),
-        fetch(`${API_BASE_URL}/api/analytics?type=summary-metrics`, { headers }),
+        fetch(`${API_BASE_URL}/api/analytics/spending-timeline`, { headers }),
+        fetch(`${API_BASE_URL}/api/analytics/top-items?limit=10`, { headers }),
+        fetch(`${API_BASE_URL}/api/analytics/category-breakdown`, { headers }),
+        fetch(`${API_BASE_URL}/api/analytics/summary-metrics`, { headers }),
       ]);
 
       if (!timelineRes.ok || !topItemsRes.ok || !categoriesRes.ok || !metricsRes.ok) {
@@ -722,7 +725,7 @@ const AnalyticsDashboard: React.FC = () => {
                         </span>
                       </div>
                       <div className="flex items-center gap-2 mb-3 ml-6">
-                        <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${CATEGORY_COLORS[item.category] || CATEGORY_COLORS['Uncategorized']}`}>
+                        <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${getCategoryColor(item.category).bg} ${getCategoryColor(item.category).text}`}>
                           {item.category}
                         </span>
                         {item.priceChange !== 0 && (
@@ -918,7 +921,7 @@ const AnalyticsDashboard: React.FC = () => {
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${CATEGORY_COLORS[item.category] || CATEGORY_COLORS['Uncategorized']}`}>
+                            <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getCategoryColor(item.category).bg} ${getCategoryColor(item.category).text}`}>
                               {item.category}
                             </span>
                           </td>
@@ -1100,10 +1103,10 @@ const AnalyticsDashboard: React.FC = () => {
                       }
                       labelLine={false}
                     >
-                      {categories.map((_, index) => (
+                      {categories.map((cat, index) => (
                         <Cell
                           key={`cell-${index}`}
-                          fill={COLORS[index % COLORS.length]}
+                          fill={getCategoryColor(cat.category).hex}
                           stroke="#fff"
                           strokeWidth={2}
                           style={{ cursor: 'pointer' }}
@@ -1130,7 +1133,7 @@ const AnalyticsDashboard: React.FC = () => {
               {/* Category Legend */}
               <div className="flex-1 w-full">
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  {categories.map((cat, index) => (
+                  {categories.map((cat) => (
                     <div
                       key={cat.category}
                       className="flex items-center justify-between p-3 rounded-lg bg-gray-50"
@@ -1138,7 +1141,7 @@ const AnalyticsDashboard: React.FC = () => {
                       <div className="flex items-center gap-2">
                         <div
                           className="flex-shrink-0 w-3 h-3 rounded-full"
-                          style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                          style={{ backgroundColor: getCategoryColor(cat.category).hex }}
                         />
                         <span className="text-sm font-medium text-gray-700 truncate">
                           {cat.category}

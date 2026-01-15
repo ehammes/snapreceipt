@@ -68,6 +68,7 @@ export interface ParsedItem {
   name: string;
   unitPrice: number;
   quantity: number;
+  discount: number;
   totalPrice: number;
   itemNumber?: string;
   item_order?: number;
@@ -257,6 +258,7 @@ export function parseReceiptText(text: string): ParsedReceiptData {
         name: bestMatch.name,
         unitPrice: price,
         quantity: 1,
+        discount: 0,
         totalPrice: price,
         order: bestMatch.order,
       });
@@ -266,7 +268,7 @@ export function parseReceiptText(text: string): ParsedReceiptData {
   };
 
   // Proximity-based discount matching: apply discount to nearest item above
-  const applyDiscountToItem = (discount: number, discountLineOrder: number) => {
+  const applyDiscountToItem = (discountAmount: number, discountLineOrder: number) => {
     if (rawItems.length === 0) return false;
 
     // Find the item with the closest order number that's before the discount line
@@ -283,8 +285,9 @@ export function parseReceiptText(text: string): ParsedReceiptData {
     }
 
     if (bestMatch) {
-      bestMatch.totalPrice = Math.round((bestMatch.totalPrice - discount) * 100) / 100;
-      bestMatch.unitPrice = bestMatch.totalPrice / bestMatch.quantity;
+      // Store the discount value and recalculate total
+      bestMatch.discount = (bestMatch.discount || 0) + discountAmount;
+      bestMatch.totalPrice = Math.round((bestMatch.unitPrice * bestMatch.quantity - bestMatch.discount) * 100) / 100;
       return true;
     }
     return false;
@@ -310,6 +313,7 @@ export function parseReceiptText(text: string): ParsedReceiptData {
           name,
           unitPrice: price,
           quantity: 1,
+          discount: 0,
           totalPrice: price,
           order: i,
         });

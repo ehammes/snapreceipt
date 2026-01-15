@@ -1,5 +1,4 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import multer from 'multer';
 import fs from 'fs';
 import path from 'path';
 import { authenticate } from '../middleware/auth';
@@ -9,15 +8,6 @@ import ItemModel from '../models/Item';
 import pool from '../config/database';
 
 const router = Router();
-
-// Configure Multer for file uploads
-const upload = multer({ dest: 'uploads/' });
-
-// Helper function - placeholder for cloud upload
-// TODO: Integrate AWS S3 or Cloudinary for production
-const uploadToCloud = (file: Express.Multer.File): string => {
-  return `/uploads/${file.filename}`;
-};
 
 // Optional auth middleware - extracts userId if token present, continues if not
 const optionalAuth = (req: Request, res: Response, next: NextFunction): void => {
@@ -34,112 +24,110 @@ const optionalAuth = (req: Request, res: Response, next: NextFunction): void => 
 };
 
 // POST /api/receipts/upload - Upload and process receipt (guest or authenticated)
-router.post('/upload', upload.single('receipt'), optionalAuth, async (req: Request, res: Response): Promise<void> => {
+router.post('/upload', optionalAuth, async (req: Request, res: Response): Promise<void> => {
   try {
-    // Check if file was uploaded
-    if (!req.file) {
-      res.status(400).json({ error: 'No receipt file uploaded' });
+    // Accept base64 image from JSON body
+    const { image } = req.body;
+
+    if (!image) {
+      res.status(400).json({ error: 'No receipt image provided' });
       return;
     }
 
-    const filePath = req.file.path;
+    // Extract base64 data (remove data URL prefix if present)
+    const base64Data = image.replace(/^data:image\/\w+;base64,/, '');
+    const imageBuffer = Buffer.from(base64Data, 'base64');
 
+    // Process with OCR
+    let ocrData;
     try {
-      // Read file as buffer
-      const imageBuffer = fs.readFileSync(filePath);
-
-      // Process with OCR
-      let ocrData;
-      try {
-        ocrData = await ocrService.processReceipt(imageBuffer);
-      } catch (ocrError) {
-        console.error('OCR processing failed:', ocrError);
-        // Use default empty structure on OCR failure
-        ocrData = {
-          storeName: '',
-          storeLocation: '',
-          storeCity: '',
-          storeState: '',
-          storeZip: '',
-          purchaseDate: new Date(),
-          totalAmount: 0,
-          items: [],
-        };
-      }
-
-      // Get image URL (placeholder for now)
-      const imageUrl = uploadToCloud(req.file);
-
-      // Check if user is authenticated
-      if (!req.userId) {
-        // Guest mode - return data without saving, clean up file
-        if (fs.existsSync(filePath)) {
-          fs.unlinkSync(filePath);
-        }
-        res.json({
-          success: true,
-          guestMode: true,
-          data: {
-            ...ocrData,
-            imageUrl,
-          },
-          message: 'Receipt processed! Create an account to save.',
-        });
-        return;
-      }
-
-      // Authenticated mode - keep the file and save to database
-      const receipt = await ReceiptModel.create({
-        user_id: req.userId,
-        image_url: imageUrl,
-        purchase_date: ocrData.purchaseDate,
-        total_amount: ocrData.totalAmount,
-        store_name: ocrData.storeName,
-        store_location: ocrData.storeLocation,
-        store_city: ocrData.storeCity,
-        store_state: ocrData.storeState,
-        store_zip: ocrData.storeZip,
-      });
-
-      // Save items as batch
-      let savedItems: any[] = [];
-      if (ocrData.items.length > 0) {
-        const itemsToCreate = ocrData.items.map((item, index) => ({
-          receipt_id: receipt.id,
-          name: item.name,
-          unit_price: item.unitPrice,
-          quantity: item.quantity,
-          total_price: item.totalPrice,
-          category: null,
-          item_order: item.item_order ?? index,  // Use OCR order or fallback to array index
-          item_number: item.itemNumber || null,  // Product ID from receipt
-        }));
-        savedItems = await ItemModel.createBatch(itemsToCreate);
-
-        // Only recalculate total from items if OCR didn't find a total (includes tax)
-        // Keep the OCR total if it was found - it's more accurate and includes tax
-        if (!ocrData.totalAmount || ocrData.totalAmount === 0) {
-          const calculatedTotal = savedItems.reduce((sum, item) => sum + parseFloat(item.total_price), 0);
-          await ReceiptModel.update(receipt.id, req.userId, { total_amount: calculatedTotal });
-        }
-      }
-
-      res.status(201).json({
-        success: true,
-        receiptId: receipt.id,
-        imageUrl,
-        data: {
-          ...receipt,
-          items: savedItems,
-        },
-      });
-    } catch (innerError) {
-      // Clean up file on error
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-      }
-      throw innerError;
+      ocrData = await ocrService.processReceipt(imageBuffer);
+    } catch (ocrError) {
+      console.error('OCR processing failed:', ocrError);
+      // Use default empty structure on OCR failure
+      ocrData = {
+        storeName: '',
+        storeLocation: '',
+        storeCity: '',
+        storeState: '',
+        storeZip: '',
+        purchaseDate: new Date(),
+        totalAmount: 0,
+        items: [],
+      };
     }
+
+    // Save image to file and get URL
+    const filename = `${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
+    const uploadsDir = path.join(__dirname, '..', '..', 'uploads');
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+    const filePath = path.join(uploadsDir, filename);
+    fs.writeFileSync(filePath, imageBuffer);
+    const imageUrl = `/uploads/${filename}`;
+
+    // Check if user is authenticated
+    if (!req.userId) {
+      // Guest mode - return data without saving (keep file for preview)
+      res.json({
+        success: true,
+        guestMode: true,
+        data: {
+          ...ocrData,
+          imageUrl,
+        },
+        message: 'Receipt processed! Create an account to save.',
+      });
+      return;
+    }
+
+    // Authenticated mode - save to database
+    const receipt = await ReceiptModel.create({
+      user_id: req.userId,
+      image_url: imageUrl,
+      purchase_date: ocrData.purchaseDate,
+      total_amount: ocrData.totalAmount,
+      store_name: ocrData.storeName,
+      store_location: ocrData.storeLocation,
+      store_city: ocrData.storeCity,
+      store_state: ocrData.storeState,
+      store_zip: ocrData.storeZip,
+    });
+
+    // Save items as batch
+    let savedItems: any[] = [];
+    if (ocrData.items.length > 0) {
+      const itemsToCreate = ocrData.items.map((item, index) => ({
+        receipt_id: receipt.id,
+        name: item.name,
+        unit_price: item.unitPrice,
+        quantity: item.quantity,
+        discount: item.discount || 0,
+        total_price: item.totalPrice,
+        category: null,
+        item_order: item.item_order ?? index,  // Use OCR order or fallback to array index
+        item_number: item.itemNumber || null,  // Product ID from receipt
+      }));
+      savedItems = await ItemModel.createBatch(itemsToCreate);
+
+      // Only recalculate total from items if OCR didn't find a total (includes tax)
+      // Keep the OCR total if it was found - it's more accurate and includes tax
+      if (!ocrData.totalAmount || ocrData.totalAmount === 0) {
+        const calculatedTotal = savedItems.reduce((sum, item) => sum + parseFloat(item.total_price), 0);
+        await ReceiptModel.update(receipt.id, req.userId, { total_amount: calculatedTotal });
+      }
+    }
+
+    res.status(201).json({
+      success: true,
+      receiptId: receipt.id,
+      imageUrl,
+      data: {
+        ...receipt,
+        items: savedItems,
+      },
+    });
   } catch (error) {
     console.error('Upload error:', error);
     res.status(500).json({ error: 'Failed to process receipt' });
@@ -161,6 +149,7 @@ router.get('/', authenticate, async (req: Request, res: Response): Promise<void>
             'name', i.name,
             'unit_price', i.unit_price,
             'quantity', i.quantity,
+            'discount', i.discount,
             'total_price', i.total_price,
             'category', i.category,
             'item_order', i.item_order,
@@ -266,7 +255,7 @@ router.post('/:id/items', authenticate, async (req: Request, res: Response): Pro
   try {
     const userId = req.userId!;
     const { id } = req.params;
-    const { name, unitPrice, quantity, category } = req.body;
+    const { name, unitPrice, quantity, discount, category } = req.body;
 
     // Validate required fields
     if (!name || unitPrice === undefined || quantity === undefined) {
@@ -281,8 +270,9 @@ router.post('/:id/items', authenticate, async (req: Request, res: Response): Pro
       return;
     }
 
-    // Calculate total price
-    const totalPrice = parseFloat(unitPrice) * parseInt(quantity);
+    // Calculate total price (unit price * quantity - discount)
+    const discountAmount = parseFloat(discount) || 0;
+    const totalPrice = Math.round((parseFloat(unitPrice) * parseInt(quantity) - discountAmount) * 100) / 100;
 
     // Create item
     const newItem = await ItemModel.create({
@@ -290,6 +280,7 @@ router.post('/:id/items', authenticate, async (req: Request, res: Response): Pro
       name,
       unit_price: parseFloat(unitPrice),
       quantity: parseInt(quantity),
+      discount: discountAmount,
       total_price: totalPrice,
       category: category || null,
     });
@@ -435,7 +426,7 @@ router.put('/:id/items/:itemId', authenticate, async (req: Request, res: Respons
   try {
     const userId = req.userId!;
     const { id, itemId } = req.params;
-    const { name, unitPrice, quantity, category } = req.body;
+    const { name, unitPrice, quantity, discount, category } = req.body;
 
     // Verify receipt belongs to user
     const receipt = await ReceiptModel.findById(id, userId);
@@ -456,12 +447,14 @@ router.put('/:id/items/:itemId', authenticate, async (req: Request, res: Respons
     if (name !== undefined) updateData.name = name;
     if (unitPrice !== undefined) updateData.unit_price = parseFloat(unitPrice);
     if (quantity !== undefined) updateData.quantity = parseInt(quantity);
+    if (discount !== undefined) updateData.discount = parseFloat(discount);
     if (category !== undefined) updateData.category = category || null;
 
-    // Calculate total_price if unitPrice or quantity changed
+    // Calculate total_price if unitPrice, quantity, or discount changed
     const newUnitPrice = updateData.unit_price ?? existingItem.unit_price;
     const newQuantity = updateData.quantity ?? existingItem.quantity;
-    updateData.total_price = newUnitPrice * newQuantity;
+    const newDiscount = updateData.discount ?? existingItem.discount;
+    updateData.total_price = Math.round((newUnitPrice * newQuantity - newDiscount) * 100) / 100;
 
     // Update item
     const updatedItem = await ItemModel.update(itemId, id, updateData);

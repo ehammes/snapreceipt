@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { CATEGORIES } from '../constants/categories';
+import { API_BASE_URL } from '../config/api';
 
 export interface ReviewItem {
   id: string;
@@ -184,7 +185,7 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
                   <div className="lg:sticky lg:top-0">
                     <div className="bg-gray-50 rounded-lg p-3">
                       <img
-                        src={formData.imageUrl}
+                        src={formData.imageUrl.startsWith('data:') || formData.imageUrl.startsWith('http') ? formData.imageUrl : `${API_BASE_URL}${formData.imageUrl}`}
                         alt="Receipt"
                         className="w-full rounded-lg shadow-md object-contain cursor-zoom-in hover:opacity-90 transition-opacity"
                         onClick={() => setImageZoomed(true)}
@@ -364,7 +365,7 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
                             />
                           </div>
                         </div>
-                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 items-end">
+                        <div className="grid grid-cols-2 sm:grid-cols-6 gap-2 items-end">
                           <div>
                             <label className="block text-xs text-gray-500 mb-1">Unit Price</label>
                             <input
@@ -397,7 +398,7 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
                               placeholder="0.00"
                             />
                           </div>
-                          <div>
+                          <div className="sm:col-span-2">
                             <label className="block text-xs text-gray-500 mb-1">Category</label>
                             <select
                               value={item.category}
@@ -487,7 +488,7 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
                           className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
                         />
                       </div>
-                      <div className="col-span-2">
+                      <div className="sm:col-span-2">
                         <label className="block text-xs text-gray-500 mb-1">Category</label>
                         <select
                           value={newItem.category}
@@ -570,7 +571,7 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
           onClick={() => setImageZoomed(false)}
         >
           <img
-            src={formData.imageUrl}
+            src={formData.imageUrl.startsWith('data:') || formData.imageUrl.startsWith('http') ? formData.imageUrl : `${API_BASE_URL}${formData.imageUrl}`}
             alt="Zoomed receipt"
             className="max-w-full max-h-full object-contain"
           />

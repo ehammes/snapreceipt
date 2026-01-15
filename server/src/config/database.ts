@@ -5,7 +5,7 @@ dotenv.config();
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  ssl: { rejectUnauthorized: false },
 });
 
 pool.on('error', (err: Error) => {
@@ -64,6 +64,7 @@ export const initializeDatabase = async (): Promise<void> => {
         name VARCHAR(500) NOT NULL,
         unit_price DECIMAL(10,2) NOT NULL,
         quantity INTEGER NOT NULL,
+        discount DECIMAL(10,2) DEFAULT 0,
         total_price DECIMAL(10,2) NOT NULL,
         category VARCHAR(100),
         item_order INTEGER DEFAULT 0,
@@ -71,9 +72,12 @@ export const initializeDatabase = async (): Promise<void> => {
       )
     `);
 
-    // Add item_number column if table already exists without it
+    // Add columns if table already exists without them
     await client.query(`
       ALTER TABLE items ADD COLUMN IF NOT EXISTS item_number VARCHAR(50)
+    `);
+    await client.query(`
+      ALTER TABLE items ADD COLUMN IF NOT EXISTS discount DECIMAL(10,2) DEFAULT 0
     `);
 
     await client.query('CREATE INDEX IF NOT EXISTS idx_receipts_user_id ON receipts(user_id)');

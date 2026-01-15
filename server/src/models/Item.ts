@@ -6,6 +6,7 @@ export interface Item {
   name: string;
   unit_price: number;
   quantity: number;
+  discount: number;
   total_price: number;
   category: string | null;
   item_order: number;
@@ -17,6 +18,7 @@ export interface CreateItemData {
   name: string;
   unit_price: number;
   quantity: number;
+  discount?: number;
   total_price: number;
   category?: string | null;
   item_order?: number;
@@ -26,14 +28,15 @@ export interface CreateItemData {
 export const ItemModel = {
   async create(data: CreateItemData): Promise<Item> {
     const result = await pool.query(
-      `INSERT INTO items (receipt_id, name, unit_price, quantity, total_price, category, item_order, item_number)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      `INSERT INTO items (receipt_id, name, unit_price, quantity, discount, total_price, category, item_order, item_number)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        RETURNING *`,
       [
         data.receipt_id,
         data.name,
         data.unit_price,
         data.quantity,
+        data.discount ?? 0,
         data.total_price,
         data.category || null,
         data.item_order ?? 0,
@@ -63,13 +66,14 @@ export const ItemModel = {
     for (let idx = 0; idx < items.length; idx++) {
       const item = items[idx];
       placeholders.push(
-        `($${paramCount++}, $${paramCount++}, $${paramCount++}, $${paramCount++}, $${paramCount++}, $${paramCount++}, $${paramCount++}, $${paramCount++})`
+        `($${paramCount++}, $${paramCount++}, $${paramCount++}, $${paramCount++}, $${paramCount++}, $${paramCount++}, $${paramCount++}, $${paramCount++}, $${paramCount++})`
       );
       values.push(
         item.receipt_id,
         item.name,
         item.unit_price,
         item.quantity,
+        item.discount ?? 0,
         item.total_price,
         item.category || null,
         item.item_order ?? idx,  // Use provided order or array index as fallback
@@ -78,7 +82,7 @@ export const ItemModel = {
     }
 
     const result = await pool.query(
-      `INSERT INTO items (receipt_id, name, unit_price, quantity, total_price, category, item_order, item_number)
+      `INSERT INTO items (receipt_id, name, unit_price, quantity, discount, total_price, category, item_order, item_number)
        VALUES ${placeholders.join(', ')}
        RETURNING *`,
       values
@@ -122,6 +126,10 @@ export const ItemModel = {
     if (data.quantity !== undefined) {
       fields.push(`quantity = $${paramIndex++}`);
       values.push(data.quantity);
+    }
+    if (data.discount !== undefined) {
+      fields.push(`discount = $${paramIndex++}`);
+      values.push(data.discount);
     }
     if (data.total_price !== undefined) {
       fields.push(`total_price = $${paramIndex++}`);

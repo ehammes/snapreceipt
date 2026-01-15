@@ -11,6 +11,7 @@ function mergeDuplicateItems(items: Array<{
   name: string;
   unitPrice: number;
   quantity: number;
+  discount: number;
   totalPrice: number;
   itemNumber?: string;
   order: number;  // Track position on receipt
@@ -18,6 +19,7 @@ function mergeDuplicateItems(items: Array<{
   name: string;
   unitPrice: number;
   quantity: number;
+  discount: number;
   totalPrice: number;
   itemNumber?: string;
   item_order: number;  // Order for database storage
@@ -32,6 +34,7 @@ function mergeDuplicateItems(items: Array<{
     name: string;
     unitPrice: number;
     quantity: number;
+    discount: number;
     totalPrice: number;
     itemNumber?: string;
     order: number;  // Keep earliest order
@@ -58,12 +61,13 @@ function mergeDuplicateItems(items: Array<{
     }
 
     if (itemMap.has(key)) {
-      // Duplicate found - increment quantity and accumulate total
+      // Duplicate found - increment quantity and accumulate totals
       const existing = itemMap.get(key)!;
       existing.quantity += 1;
+      existing.discount = Math.round((existing.discount + item.discount) * 100) / 100;
       existing.totalPrice = Math.round((existing.totalPrice + item.totalPrice) * 100) / 100;
-      // Recalculate unit price as average
-      existing.unitPrice = Math.round((existing.totalPrice / existing.quantity) * 100) / 100;
+      // Recalculate unit price as average (before discount)
+      existing.unitPrice = Math.round(((existing.totalPrice + existing.discount) / existing.quantity) * 100) / 100;
       // Keep the earliest order (first occurrence on receipt)
       existing.order = Math.min(existing.order, item.order);
     } else {
@@ -73,6 +77,7 @@ function mergeDuplicateItems(items: Array<{
         name: item.name,
         unitPrice: item.unitPrice,
         quantity: item.quantity || 1,
+        discount: item.discount || 0,
         totalPrice: item.totalPrice,
         itemNumber: item.itemNumber,
         order: item.order,
@@ -95,6 +100,7 @@ export interface ParsedItem {
   name: string;
   unitPrice: number;
   quantity: number;
+  discount: number;
   totalPrice: number;
   itemNumber?: string;
   item_order?: number;  // Order on receipt (for sorting)
@@ -358,8 +364,9 @@ class OCRService {
     const priceLineRegex = /^(\d+\.\d{2})\s*([A-Z])?\s*$/;
 
     // Pattern for discount line: negative price like "8.00-A" or "800-A" (OCR may miss decimal)
-    // Captures: group 1 = amount (may or may not have decimal), group 2 = tax code
-    const discountLineRegex = /^(\d+(?:\.\d{2})?)-([A-Z])?\s*$/;
+    // Matches at start of line OR at end of line (right-aligned on receipts)
+    // Captures: group 1 = amount (may or may not have decimal)
+    const discountLineRegex = /(\d+(?:\.\d{2})?)-\s*([A-Z])?\s*$/;
 
     // Pattern for item with price on same line (with optional tax code prefix)
     // Note: $ can be OCR error for 8 or S
@@ -375,18 +382,18 @@ class OCRService {
 
     // Collect raw items first (before merging duplicates)
     // Include order to track position on receipt
-    const rawItems: Array<ParsedItem & { order: number }> = [];
+    const rawItems: Array<ParsedItem & { order: number; discount: number }> = [];
 
-    // Helper function to apply pending discounts to prices
-    // Discounts apply to the FIRST price (which corresponds to the first item in multi-column)
+    // Track discounts to apply to items (keyed by price order)
+    const discountsByPriceOrder = new Map<number, number>();
+
+    // Helper function to apply pending discounts - stores them for later application to items
     const applyPendingDiscounts = (prices: Array<{ price: number; order: number }>) => {
       if (pendingDiscounts.length === 0 || prices.length === 0) return;
 
-      // Apply each discount to the first price
-      for (const discountInfo of pendingDiscounts) {
-        const firstPrice = prices[0];
-        firstPrice.price = Math.round((firstPrice.price - discountInfo.discount) * 100) / 100;
-      }
+      // Sum all pending discounts and apply to first price's order
+      const totalDiscount = pendingDiscounts.reduce((sum, d) => sum + d.discount, 0);
+      discountsByPriceOrder.set(prices[0].order, totalDiscount);
       pendingDiscounts.length = 0;
     };
 
@@ -394,7 +401,7 @@ class OCRService {
     const matchPendingItemsAndPrices = () => {
       if (pendingItems.length === 0 || pendingPrices.length === 0) return;
 
-      // Apply any pending discounts to prices before matching
+      // Apply any pending discounts before matching
       applyPendingDiscounts(pendingPrices);
 
       // When we have equal counts, match in same order (FIFO)
@@ -404,12 +411,15 @@ class OCRService {
         for (let k = 0; k < pendingItems.length; k++) {
           const item = pendingItems[k];
           const priceInfo = pendingPrices[k];
+          const discount = discountsByPriceOrder.get(priceInfo.order) || 0;
+          const totalPrice = Math.round((priceInfo.price - discount) * 100) / 100;
           rawItems.push({
             itemNumber: item.itemNumber,
             name: item.name,
             unitPrice: priceInfo.price,
             quantity: 1,
-            totalPrice: priceInfo.price,
+            discount: discount,
+            totalPrice: totalPrice,
             order: item.order,
           });
         }
@@ -420,12 +430,15 @@ class OCRService {
         while (pendingItems.length > 0 && pendingPrices.length > 0) {
           const item = pendingItems.shift()!;
           const priceInfo = pendingPrices.shift()!;
+          const discount = discountsByPriceOrder.get(priceInfo.order) || 0;
+          const totalPrice = Math.round((priceInfo.price - discount) * 100) / 100;
           rawItems.push({
             itemNumber: item.itemNumber,
             name: item.name,
             unitPrice: priceInfo.price,
             quantity: 1,
-            totalPrice: priceInfo.price,
+            discount: discount,
+            totalPrice: totalPrice,
             order: item.order,
           });
         }
@@ -458,6 +471,23 @@ class OCRService {
 
       // Check if this is a line to skip but keep pending item
       if (skipButKeepPendingPatterns.some(pattern => pattern.test(line))) {
+        // Before skipping, check if there's a discount at the end of the line (e.g., "0000349287 / 1316229 4.00-")
+        const endOfLineDiscountMatch = line.match(/(\d+\.\d{2})-\s*([A-Z])?\s*$/);
+        if (endOfLineDiscountMatch) {
+          const discount = parseFloat(endOfLineDiscountMatch[1]);
+          // Apply discount to last raw item or buffer it
+          if (rawItems.length > 0) {
+            const lastItem = rawItems[rawItems.length - 1];
+            lastItem.discount = (lastItem.discount || 0) + discount;
+            lastItem.totalPrice = Math.round((lastItem.unitPrice * lastItem.quantity - lastItem.discount) * 100) / 100;
+          } else if (pendingPrices.length > 0) {
+            const firstPrice = pendingPrices[0];
+            const existing = discountsByPriceOrder.get(firstPrice.order) || 0;
+            discountsByPriceOrder.set(firstPrice.order, existing + discount);
+          } else if (pendingItems.length > 0) {
+            pendingDiscounts.push({ discount, order: i });
+          }
+        }
         continue;
       }
 
@@ -499,20 +529,21 @@ class OCRService {
           discount = discount / 100;
         }
 
-        // If we have pending prices, apply discount to first pending price
+        // If we have pending prices, store discount for that price order
         if (pendingPrices.length > 0) {
           const firstPrice = pendingPrices[0];
-          firstPrice.price = Math.round((firstPrice.price - discount) * 100) / 100;
+          const existing = discountsByPriceOrder.get(firstPrice.order) || 0;
+          discountsByPriceOrder.set(firstPrice.order, existing + discount);
         }
         // If items are pending but no prices yet, buffer the discount
         else if (pendingItems.length > 0) {
           pendingDiscounts.push({ discount, order: i });
         }
-        // If we have raw items, apply to last item (original behavior)
+        // If we have raw items, apply to last item
         else if (rawItems.length > 0) {
           const lastItem = rawItems[rawItems.length - 1];
-          lastItem.totalPrice = Math.round((lastItem.totalPrice - discount) * 100) / 100;
-          lastItem.unitPrice = lastItem.totalPrice / lastItem.quantity;
+          lastItem.discount = (lastItem.discount || 0) + discount;
+          lastItem.totalPrice = Math.round((lastItem.unitPrice * lastItem.quantity - lastItem.discount) * 100) / 100;
         }
         continue;
       }
@@ -523,12 +554,14 @@ class OCRService {
         // First, resolve any pending items using orphanPrice if available
         if (pendingItems.length > 0 && orphanPrice) {
           const item = pendingItems.shift()!;
+          const discount = discountsByPriceOrder.get(orphanPrice.order) || 0;
           rawItems.push({
             itemNumber: item.itemNumber,
             name: item.name,
             unitPrice: orphanPrice.price,
             quantity: 1,
-            totalPrice: orphanPrice.price,
+            discount: discount,
+            totalPrice: Math.round((orphanPrice.price - discount) * 100) / 100,
             order: item.order,
           });
           orphanPrice = null;
@@ -544,6 +577,7 @@ class OCRService {
             name,
             unitPrice: price,
             quantity: 1,
+            discount: 0,
             totalPrice: price,
             order: i,  // Use current line number as order
           });
@@ -579,12 +613,14 @@ class OCRService {
     // Handle any remaining pending items using orphan price
     while (pendingItems.length > 0 && orphanPrice) {
       const item = pendingItems.shift()!;
+      const discount = discountsByPriceOrder.get(orphanPrice.order) || 0;
       rawItems.push({
         itemNumber: item.itemNumber,
         name: item.name,
         unitPrice: orphanPrice.price,
         quantity: 1,
-        totalPrice: orphanPrice.price,
+        discount: discount,
+        totalPrice: Math.round((orphanPrice.price - discount) * 100) / 100,
         order: item.order,
       });
       orphanPrice = null;
