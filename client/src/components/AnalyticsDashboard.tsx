@@ -50,9 +50,6 @@ const CATEGORY_COLOR_MAP: Record<string, { hex: string; bg: string; text: string
   'Uncategorized': { hex: '#bdc3c7', bg: 'bg-gray-100', text: 'text-gray-500' },        // Light gray
 };
 
-// Fallback colors for any categories not in the map
-const FALLBACK_COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D'];
-
 // Helper to get category color
 const getCategoryColor = (category: string) => {
   return CATEGORY_COLOR_MAP[category] || { hex: '#6b7280', bg: 'bg-gray-100', text: 'text-gray-700' };
