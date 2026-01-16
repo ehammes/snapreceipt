@@ -8,6 +8,6 @@
     "start:client": "cd client && npm start"
   },
   "engines": {
-    "node": "20.x"
+    "node": "24.x"
   }
 }
