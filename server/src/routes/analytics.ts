@@ -4,221 +4,204 @@ import pool from '../config/database';
 
 const router = Router();
 
-// GET /api/analytics/spending-timeline - Monthly spending data
-router.get('/spending-timeline', authenticate, async (req: Request, res: Response): Promise<void> => {
+// GET /api/analytics?type=<type> - Unified analytics endpoint
+router.get('/', authenticate, async (req: Request, res: Response): Promise<void> => {
+  const { type } = req.query;
+  const userId = req.userId!;
+
   try {
-    const userId = req.userId!;
-
-    const query = `
-      SELECT
-        TO_CHAR(purchase_date, 'YYYY-MM') as month,
-        SUM(total_amount) as amount
-      FROM receipts
-      WHERE user_id = $1
-      GROUP BY TO_CHAR(purchase_date, 'YYYY-MM')
-      ORDER BY month ASC
-    `;
-
-    const result = await pool.query(query, [userId]);
-
-    // Format the data
-    const timeline = result.rows.map(row => ({
-      month: formatMonth(row.month),
-      amount: parseFloat(row.amount) || 0,
-    }));
-
-    res.json({ success: true, timeline });
+    if (type === 'spending-timeline') {
+      return handleSpendingTimeline(userId, res);
+    } else if (type === 'top-items') {
+      return handleTopItems(userId, req, res);
+    } else if (type === 'category-breakdown') {
+      return handleCategoryBreakdown(userId, res);
+    } else if (type === 'summary-metrics') {
+      return handleSummaryMetrics(userId, res);
+    } else if (type === 'summary') {
+      return handleSummary(userId, res);
+    } else {
+      res.status(400).json({ error: 'Invalid type. Use ?type=spending-timeline|top-items|category-breakdown|summary-metrics|summary' });
+    }
   } catch (error) {
-    console.error('Spending timeline error:', error);
-    res.status(500).json({ error: 'Failed to fetch spending timeline' });
+    console.error('Analytics error:', error);
+    res.status(500).json({ error: 'Failed to fetch analytics' });
   }
 });
 
-// GET /api/analytics/top-items - Most purchased items
-router.get('/top-items', authenticate, async (req: Request, res: Response): Promise<void> => {
-  try {
-    const userId = req.userId!;
-    const limit = parseInt(req.query.limit as string) || 10;
+// Handler functions
+async function handleSpendingTimeline(userId: string, res: Response): Promise<void> {
+  const query = `
+    SELECT
+      TO_CHAR(purchase_date, 'YYYY-MM') as month,
+      SUM(total_amount) as amount
+    FROM receipts
+    WHERE user_id = $1
+    GROUP BY TO_CHAR(purchase_date, 'YYYY-MM')
+    ORDER BY month ASC
+  `;
 
-    const query = `
-      SELECT
-        i.name,
-        SUM(i.quantity) as quantity,
-        SUM(i.total_price) as total_spent,
-        COUNT(DISTINCT r.id) as purchase_count,
-        MODE() WITHIN GROUP (ORDER BY i.category) as category,
-        MODE() WITHIN GROUP (ORDER BY i.item_number) as item_number,
-        MAX(r.purchase_date) as last_purchased,
-        (
-          SELECT i2.unit_price
-          FROM items i2
-          JOIN receipts r2 ON i2.receipt_id = r2.id
-          WHERE r2.user_id = $1 AND i2.name = i.name
-          ORDER BY r2.purchase_date DESC
-          LIMIT 1
-        ) as latest_price,
-        (
-          SELECT i3.unit_price
-          FROM items i3
-          JOIN receipts r3 ON i3.receipt_id = r3.id
-          WHERE r3.user_id = $1 AND i3.name = i.name
-          ORDER BY r3.purchase_date ASC
-          LIMIT 1
-        ) as first_price
-      FROM items i
-      JOIN receipts r ON i.receipt_id = r.id
-      WHERE r.user_id = $1
-      GROUP BY i.name
-      ORDER BY quantity DESC, total_spent DESC
-      LIMIT $2
-    `;
+  const result = await pool.query(query, [userId]);
+  const timeline = result.rows.map(row => ({
+    month: formatMonth(row.month),
+    amount: parseFloat(row.amount) || 0,
+  }));
 
-    const result = await pool.query(query, [userId, limit]);
+  res.json({ success: true, timeline });
+}
 
-    const topItems = result.rows.map(row => {
-      const latestPrice = parseFloat(row.latest_price) || 0;
-      const firstPrice = parseFloat(row.first_price) || 0;
-      let priceChange = 0;
-      if (firstPrice > 0 && latestPrice > 0) {
-        priceChange = ((latestPrice - firstPrice) / firstPrice) * 100;
-      }
+async function handleTopItems(userId: string, req: Request, res: Response): Promise<void> {
+  const limit = parseInt(req.query.limit as string) || 10;
 
-      return {
-        name: row.name,
-        quantity: parseInt(row.quantity) || 0,
-        totalSpent: parseFloat(row.total_spent) || 0,
-        purchaseCount: parseInt(row.purchase_count) || 0,
-        category: row.category || 'Uncategorized',
-        itemNumber: row.item_number || '',
-        lastPurchased: row.last_purchased,
-        priceChange: Math.round(priceChange * 10) / 10, // Round to 1 decimal
-      };
-    });
+  const query = `
+    SELECT
+      i.name,
+      SUM(i.quantity) as quantity,
+      SUM(i.total_price) as total_spent,
+      COUNT(DISTINCT r.id) as purchase_count,
+      MODE() WITHIN GROUP (ORDER BY i.category) as category,
+      MODE() WITHIN GROUP (ORDER BY i.item_number) as item_number,
+      MAX(r.purchase_date) as last_purchased,
+      (
+        SELECT i2.unit_price
+        FROM items i2
+        JOIN receipts r2 ON i2.receipt_id = r2.id
+        WHERE r2.user_id = $1 AND i2.name = i.name
+        ORDER BY r2.purchase_date DESC
+        LIMIT 1
+      ) as latest_price,
+      (
+        SELECT i3.unit_price
+        FROM items i3
+        JOIN receipts r3 ON i3.receipt_id = r3.id
+        WHERE r3.user_id = $1 AND i3.name = i.name
+        ORDER BY r3.purchase_date ASC
+        LIMIT 1
+      ) as first_price
+    FROM items i
+    JOIN receipts r ON i.receipt_id = r.id
+    WHERE r.user_id = $1
+    GROUP BY i.name
+    ORDER BY quantity DESC, total_spent DESC
+    LIMIT $2
+  `;
 
-    res.json({ success: true, topItems });
-  } catch (error) {
-    console.error('Top items error:', error);
-    res.status(500).json({ error: 'Failed to fetch top items' });
-  }
-});
+  const result = await pool.query(query, [userId, limit]);
+  const topItems = result.rows.map(row => {
+    const latestPrice = parseFloat(row.latest_price) || 0;
+    const firstPrice = parseFloat(row.first_price) || 0;
+    let priceChange = 0;
+    if (firstPrice > 0 && latestPrice > 0) {
+      priceChange = ((latestPrice - firstPrice) / firstPrice) * 100;
+    }
 
-// GET /api/analytics/category-breakdown - Spending by category
-router.get('/category-breakdown', authenticate, async (req: Request, res: Response): Promise<void> => {
-  try {
-    const userId = req.userId!;
-
-    const query = `
-      SELECT
-        COALESCE(i.category, 'Uncategorized') as category,
-        SUM(i.total_price) as total_spent,
-        COUNT(*) as item_count
-      FROM items i
-      JOIN receipts r ON i.receipt_id = r.id
-      WHERE r.user_id = $1
-      GROUP BY COALESCE(i.category, 'Uncategorized')
-      ORDER BY total_spent DESC
-    `;
-
-    const result = await pool.query(query, [userId]);
-
-    const categories = result.rows.map(row => ({
-      category: row.category,
+    return {
+      name: row.name,
+      quantity: parseInt(row.quantity) || 0,
       totalSpent: parseFloat(row.total_spent) || 0,
-      itemCount: parseInt(row.item_count) || 0,
-    }));
+      purchaseCount: parseInt(row.purchase_count) || 0,
+      category: row.category || 'Uncategorized',
+      itemNumber: row.item_number || '',
+      lastPurchased: row.last_purchased,
+      priceChange: Math.round(priceChange * 10) / 10,
+    };
+  });
 
-    res.json({ success: true, categories });
-  } catch (error) {
-    console.error('Category breakdown error:', error);
-    res.status(500).json({ error: 'Failed to fetch category breakdown' });
-  }
-});
+  res.json({ success: true, topItems });
+}
 
-// GET /api/analytics/summary-metrics - Summary metrics for dashboard cards
-router.get('/summary-metrics', authenticate, async (req: Request, res: Response): Promise<void> => {
-  try {
-    const userId = req.userId!;
+async function handleCategoryBreakdown(userId: string, res: Response): Promise<void> {
+  const query = `
+    SELECT
+      COALESCE(i.category, 'Uncategorized') as category,
+      SUM(i.total_price) as total_spent,
+      COUNT(*) as item_count
+    FROM items i
+    JOIN receipts r ON i.receipt_id = r.id
+    WHERE r.user_id = $1
+    GROUP BY COALESCE(i.category, 'Uncategorized')
+    ORDER BY total_spent DESC
+  `;
 
-    // Get receipt metrics (excluding $0 receipts)
-    const receiptQuery = `
-      SELECT
-        COALESCE(SUM(total_amount), 0) as total_spent,
-        COUNT(*) as total_receipts
-      FROM receipts
-      WHERE user_id = $1 AND total_amount > 0
-    `;
-    const receiptResult = await pool.query(receiptQuery, [userId]);
-    const receiptRow = receiptResult.rows[0];
+  const result = await pool.query(query, [userId]);
+  const categories = result.rows.map(row => ({
+    category: row.category,
+    totalSpent: parseFloat(row.total_spent) || 0,
+    itemCount: parseInt(row.item_count) || 0,
+  }));
 
-    const totalSpent = parseFloat(receiptRow.total_spent) || 0;
-    const totalReceipts = parseInt(receiptRow.total_receipts) || 0;
-    const averagePerReceipt = totalReceipts > 0 ? totalSpent / totalReceipts : 0;
+  res.json({ success: true, categories });
+}
 
-    // Get item metrics (excluding items from $0 receipts)
-    const itemQuery = `
-      SELECT
-        COALESCE(SUM(i.quantity), 0) as total_items,
-        COUNT(DISTINCT LOWER(i.name)) as unique_items
-      FROM items i
-      JOIN receipts r ON i.receipt_id = r.id
-      WHERE r.user_id = $1 AND r.total_amount > 0
-    `;
-    const itemResult = await pool.query(itemQuery, [userId]);
-    const itemRow = itemResult.rows[0];
+async function handleSummaryMetrics(userId: string, res: Response): Promise<void> {
+  // Get receipt metrics (excluding $0 receipts)
+  const receiptQuery = `
+    SELECT
+      COALESCE(SUM(total_amount), 0) as total_spent,
+      COUNT(*) as total_receipts
+    FROM receipts
+    WHERE user_id = $1 AND total_amount > 0
+  `;
+  const receiptResult = await pool.query(receiptQuery, [userId]);
+  const receiptRow = receiptResult.rows[0];
 
-    const totalItems = parseInt(itemRow.total_items) || 0;
-    const uniqueItems = parseInt(itemRow.unique_items) || 0;
+  const totalSpent = parseFloat(receiptRow.total_spent) || 0;
+  const totalReceipts = parseInt(receiptRow.total_receipts) || 0;
+  const averagePerReceipt = totalReceipts > 0 ? totalSpent / totalReceipts : 0;
 
-    res.json({
-      totalSpent,
-      totalItems,
-      uniqueItems,
-      totalReceipts,
-      averagePerReceipt: Math.round(averagePerReceipt * 100) / 100,
-    });
-  } catch (error) {
-    console.error('Summary metrics error:', error);
-    res.status(500).json({ error: 'Failed to fetch summary metrics' });
-  }
-});
+  // Get item metrics (excluding items from $0 receipts)
+  const itemQuery = `
+    SELECT
+      COALESCE(SUM(i.quantity), 0) as total_items,
+      COUNT(DISTINCT LOWER(i.name)) as unique_items
+    FROM items i
+    JOIN receipts r ON i.receipt_id = r.id
+    WHERE r.user_id = $1 AND r.total_amount > 0
+  `;
+  const itemResult = await pool.query(itemQuery, [userId]);
+  const itemRow = itemResult.rows[0];
 
-// GET /api/analytics/summary - Overall summary stats
-router.get('/summary', authenticate, async (req: Request, res: Response): Promise<void> => {
-  try {
-    const userId = req.userId!;
+  const totalItems = parseInt(itemRow.total_items) || 0;
+  const uniqueItems = parseInt(itemRow.unique_items) || 0;
 
-    const query = `
-      SELECT
-        COUNT(DISTINCT r.id) as total_receipts,
-        COALESCE(SUM(r.total_amount), 0) as total_spent,
-        COUNT(DISTINCT i.name) as unique_items,
-        COALESCE(AVG(r.total_amount), 0) as avg_receipt,
-        MIN(r.purchase_date) as first_purchase,
-        MAX(r.purchase_date) as last_purchase
-      FROM receipts r
-      LEFT JOIN items i ON r.id = i.receipt_id
-      WHERE r.user_id = $1
-    `;
+  res.json({
+    totalSpent,
+    totalItems,
+    uniqueItems,
+    totalReceipts,
+    averagePerReceipt: Math.round(averagePerReceipt * 100) / 100,
+  });
+}
 
-    const result = await pool.query(query, [userId]);
-    const row = result.rows[0];
+async function handleSummary(userId: string, res: Response): Promise<void> {
+  const query = `
+    SELECT
+      COUNT(DISTINCT r.id) as total_receipts,
+      COALESCE(SUM(r.total_amount), 0) as total_spent,
+      COUNT(DISTINCT i.name) as unique_items,
+      COALESCE(AVG(r.total_amount), 0) as avg_receipt,
+      MIN(r.purchase_date) as first_purchase,
+      MAX(r.purchase_date) as last_purchase
+    FROM receipts r
+    LEFT JOIN items i ON r.id = i.receipt_id
+    WHERE r.user_id = $1
+  `;
 
-    res.json({
-      success: true,
-      summary: {
-        totalReceipts: parseInt(row.total_receipts) || 0,
-        totalSpent: parseFloat(row.total_spent) || 0,
-        uniqueItems: parseInt(row.unique_items) || 0,
-        avgReceipt: parseFloat(row.avg_receipt) || 0,
-        firstPurchase: row.first_purchase,
-        lastPurchase: row.last_purchase,
-      },
-    });
-  } catch (error) {
-    console.error('Summary error:', error);
-    res.status(500).json({ error: 'Failed to fetch summary' });
-  }
-});
+  const result = await pool.query(query, [userId]);
+  const row = result.rows[0];
+
+  res.json({
+    success: true,
+    summary: {
+      totalReceipts: parseInt(row.total_receipts) || 0,
+      totalSpent: parseFloat(row.total_spent) || 0,
+      uniqueItems: parseInt(row.unique_items) || 0,
+      avgReceipt: parseFloat(row.avg_receipt) || 0,
+      firstPurchase: row.first_purchase,
+      lastPurchase: row.last_purchase,
+    },
+  });
+}
 
 // Helper: Format month from YYYY-MM to readable format
 function formatMonth(yearMonth: string): string {
