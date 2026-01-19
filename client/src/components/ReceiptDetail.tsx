@@ -334,7 +334,7 @@ const ReceiptDetail: React.FC = () => {
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(
-        `${API_BASE_URL}/api/receipts/${id}/items/${editingItemId}`,
+        `${API_BASE_URL}/api/items/${editingItemId}?receiptId=${id}`,
         {
           method: 'PUT',
           headers: {
@@ -379,7 +379,7 @@ const ReceiptDetail: React.FC = () => {
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(
-        `${API_BASE_URL}/api/receipts/${id}/items/${itemToDelete.id}`,
+        `${API_BASE_URL}/api/items/${itemToDelete.id}?receiptId=${id}`,
         {
           method: 'DELETE',
           headers: {

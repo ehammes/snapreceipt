@@ -35,7 +35,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (req.method === 'PUT') {
-      const { name, unitPrice, quantity, category } = req.body;
+      const { name, unitPrice, quantity, discount, category } = req.body;
       const existingItem = itemCheck.rows[0];
 
       const updates: string[] = [];
@@ -45,13 +45,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (name !== undefined) { updates.push(`name = $${paramIndex++}`); values.push(name); }
       if (unitPrice !== undefined) { updates.push(`unit_price = $${paramIndex++}`); values.push(parseFloat(unitPrice)); }
       if (quantity !== undefined) { updates.push(`quantity = $${paramIndex++}`); values.push(parseInt(quantity)); }
+      if (discount !== undefined) { updates.push(`discount = $${paramIndex++}`); values.push(parseFloat(discount)); }
       if (category !== undefined) { updates.push(`category = $${paramIndex++}`); values.push(category || null); }
 
       // Calculate new total
       const newUnitPrice = unitPrice !== undefined ? parseFloat(unitPrice) : existingItem.unit_price;
       const newQuantity = quantity !== undefined ? parseInt(quantity) : existingItem.quantity;
+      const newDiscount = discount !== undefined ? parseFloat(discount) : (existingItem.discount || 0);
       updates.push(`total_price = $${paramIndex++}`);
-      values.push(newUnitPrice * newQuantity);
+      values.push(Math.round((newUnitPrice * newQuantity - newDiscount) * 100) / 100);
 
       values.push(itemId, id);
       const result = await pool.query(
