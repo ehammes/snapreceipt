@@ -818,6 +818,7 @@ const ReceiptGallery: React.FC = () => {
                 <button
                   onClick={handleDeleteConfirm}
                   disabled={deleting}
+                  autoFocus
                   className="flex-1 px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {deleting ? (
