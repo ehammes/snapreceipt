@@ -6,6 +6,7 @@ export const CATEGORIES = [
   'Health & Beauty',
   'Household Supplies',
   'Other',
+  'Uncategorized'
 ] as const;
 
 export type Category = (typeof CATEGORIES)[number];

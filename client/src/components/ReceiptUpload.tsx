@@ -121,7 +121,7 @@ const ReceiptUpload: React.FC = () => {
         quantity: item.quantity,
         discount: item.discount || 0,
         totalPrice: item.totalPrice,
-        category: item.category || 'Groceries',
+        category: item.category || 'Uncategorized',
       })),
     };
   };
@@ -367,7 +367,7 @@ const ReceiptUpload: React.FC = () => {
           discount: parseFloat(item.discount) || 0,
           totalPrice: parseFloat(item.total_price) || item.totalPrice || 0,
           itemNumber: item.item_number || item.itemNumber || '',
-          category: item.category || 'Groceries',
+          category: item.category || 'Uncategorized',
         })),
       };
 

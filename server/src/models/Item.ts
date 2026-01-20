@@ -38,7 +38,7 @@ export const ItemModel = {
         data.quantity,
         data.discount ?? 0,
         data.total_price,
-        data.category || null,
+        data.category || 'Uncategorized',
         data.item_order ?? 0,
         data.item_number || null,
       ]
@@ -75,7 +75,7 @@ export const ItemModel = {
         item.quantity,
         item.discount ?? 0,
         item.total_price,
-        item.category || null,
+        item.category || 'Uncategorized',
         item.item_order ?? idx,  // Use provided order or array index as fallback
         item.item_number || null
       );

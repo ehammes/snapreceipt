@@ -48,7 +48,7 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
     quantity: 1,
     discount: 0,
     totalPrice: 0,
-    category: 'Groceries',
+    category: 'Uncategorized',
   });
 
   // Separate state for subtotal and tax to allow manual override
@@ -113,7 +113,7 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
       quantity: 1,
       discount: 0,
       totalPrice: 0,
-      category: 'Groceries',
+      category: 'Uncategorized',
     });
     setAddingItem(false);
   };

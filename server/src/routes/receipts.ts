@@ -308,6 +308,61 @@ router.post('/:id/items', authenticate, async (req: Request, res: Response): Pro
   }
 });
 
+// PUT /api/receipts/:id/items/:itemId - Update item
+router.put('/:id/items/:itemId', authenticate, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
+    const { id, itemId } = req.params;
+    const { name, unitPrice, quantity, discount, category } = req.body;
+
+    // Verify receipt belongs to user
+    const receipt = await ReceiptModel.findById(id, userId);
+    if (!receipt) {
+      res.status(404).json({ error: 'Receipt not found' });
+      return;
+    }
+
+    // Verify item exists and belongs to this receipt
+    const existingItem = await ItemModel.findById(itemId, id);
+    if (!existingItem) {
+      res.status(404).json({ error: 'Item not found' });
+      return;
+    }
+
+    // Build update object with provided fields
+    const updateData: any = {};
+    if (name !== undefined) updateData.name = name;
+    if (unitPrice !== undefined) updateData.unit_price = parseFloat(unitPrice);
+    if (quantity !== undefined) updateData.quantity = parseInt(quantity);
+    if (discount !== undefined) updateData.discount = parseFloat(discount);
+    if (category !== undefined) updateData.category = category;
+
+    // Recalculate total price if unit price, quantity, or discount changed
+    if (unitPrice !== undefined || quantity !== undefined || discount !== undefined) {
+      const finalUnitPrice = unitPrice !== undefined ? parseFloat(unitPrice) : existingItem.unit_price;
+      const finalQuantity = quantity !== undefined ? parseInt(quantity) : existingItem.quantity;
+      const finalDiscount = discount !== undefined ? parseFloat(discount) : existingItem.discount;
+      updateData.total_price = Math.round((finalUnitPrice * finalQuantity - finalDiscount) * 100) / 100;
+    }
+
+    // Update item
+    const updatedItem = await ItemModel.update(itemId, id, updateData);
+
+    if (!updatedItem) {
+      res.status(500).json({ error: 'Failed to update item' });
+      return;
+    }
+
+    res.json({
+      success: true,
+      item: updatedItem,
+    });
+  } catch (error) {
+    console.error('Update item error:', error);
+    res.status(500).json({ error: 'Failed to update item' });
+  }
+});
+
 // PATCH /api/receipts/:id - Update receipt details
 router.patch('/:id', authenticate, async (req: Request, res: Response): Promise<void> => {
   try {
