@@ -51,6 +51,12 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
     category: 'Uncategorized',
   });
 
+  // Lock in initial tax amount on first render (stays constant unless manually edited)
+  const [initialTax] = useState<number>(() => {
+    const itemsTotal = data.items.reduce((sum, item) => sum + (Number(item.totalPrice) || 0), 0);
+    return Math.max(0, data.totalAmount - itemsTotal);
+  });
+
   // Separate state for subtotal and tax to allow manual override
   const [subtotalOverride, setSubtotalOverride] = useState<string | null>(null);
   const [taxOverride, setTaxOverride] = useState<string | null>(null);
@@ -71,9 +77,8 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
 
   // Update item
   const updateItem = (itemId: string, field: keyof ReviewItem, value: string | number) => {
-    setFormData(prev => ({
-      ...prev,
-      items: prev.items.map(item => {
+    setFormData(prev => {
+      const updatedItems = prev.items.map(item => {
         if (item.id !== itemId) return item;
         const updated = { ...item, [field]: value };
         // Recalculate total if unit price, quantity, or discount changes
@@ -82,16 +87,35 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
           updated.totalPrice = Math.round((subtotal - (Number(updated.discount) || 0)) * 100) / 100;
         }
         return updated;
-      }),
-    }));
+      });
+
+      // Recalculate receipt total as: Items + Tax
+      const newItemsTotal = updatedItems.reduce((sum, item) => sum + (Number(item.totalPrice) || 0), 0);
+      const newTotal = Math.round((newItemsTotal + getTax()) * 100) / 100;
+
+      return {
+        ...prev,
+        items: updatedItems,
+        totalAmount: newTotal,
+      };
+    });
   };
 
   // Delete item
   const deleteItem = (itemId: string) => {
-    setFormData(prev => ({
-      ...prev,
-      items: prev.items.filter(item => item.id !== itemId),
-    }));
+    setFormData(prev => {
+      const updatedItems = prev.items.filter(item => item.id !== itemId);
+
+      // Recalculate receipt total as: Items + Tax
+      const newItemsTotal = updatedItems.reduce((sum, item) => sum + (Number(item.totalPrice) || 0), 0);
+      const newTotal = Math.round((newItemsTotal + getTax()) * 100) / 100;
+
+      return {
+        ...prev,
+        items: updatedItems,
+        totalAmount: newTotal,
+      };
+    });
   };
 
   // Add new item
@@ -102,10 +126,19 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
       id: generateId(),
       totalPrice: Math.round((subtotal - (newItem.discount || 0)) * 100) / 100,
     };
-    setFormData(prev => ({
-      ...prev,
-      items: [...prev.items, itemToAdd],
-    }));
+    setFormData(prev => {
+      const updatedItems = [...prev.items, itemToAdd];
+
+      // Recalculate receipt total as: Items + Tax
+      const newItemsTotal = updatedItems.reduce((sum, item) => sum + (Number(item.totalPrice) || 0), 0);
+      const newTotal = Math.round((newItemsTotal + getTax()) * 100) / 100;
+
+      return {
+        ...prev,
+        items: updatedItems,
+        totalAmount: newTotal,
+      };
+    });
     setNewItem({
       itemNumber: '',
       name: '',
@@ -131,12 +164,12 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
     return calculateItemsTotal();
   };
 
-  // Get effective tax (override or calculated)
+  // Get effective tax (override or locked initial value)
   const getTax = () => {
     if (taxOverride !== null) {
       return parseFloat(taxOverride) || 0;
     }
-    return Math.max(0, formData.totalAmount - calculateItemsTotal());
+    return initialTax;
   };
 
   // Handle subtotal change - update total automatically

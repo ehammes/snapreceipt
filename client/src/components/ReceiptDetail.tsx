@@ -72,7 +72,7 @@ const ReceiptDetail: React.FC = () => {
     unitPrice: '',
     quantity: '1',
     discount: '0',
-    category: 'Groceries',
+    category: 'Uncategorized',
   });
 
   // Delete state
@@ -102,6 +102,9 @@ const ReceiptDetail: React.FC = () => {
   // Item sorting state
   const [itemSortBy, setItemSortBy] = useState<'receipt' | 'totalPrice'>('receipt');
   const [itemSortOrder, setItemSortOrder] = useState<'asc' | 'desc'>('asc');
+
+  // Lock in initial tax when receipt loads (stays constant unless manually edited)
+  const [lockedTax, setLockedTax] = useState<number>(0);
 
   const fetchReceipt = useCallback(async () => {
     try {
@@ -135,6 +138,11 @@ const ReceiptDetail: React.FC = () => {
       const data = await response.json();
       const receiptData = data.receipt;
       setReceipt(receiptData);
+
+      // Lock in the initial tax amount (Total - Items)
+      const itemsTotal = receiptData.items?.reduce((sum: number, item: any) => sum + (Number(item.total_price) || 0), 0) || 0;
+      const initialTax = Math.max(0, (Number(receiptData.total_amount) || 0) - itemsTotal);
+      setLockedTax(initialTax);
 
       // Initialize store form with receipt data
       setStoreForm({
@@ -212,6 +220,21 @@ const ReceiptDetail: React.FC = () => {
         throw new Error('Failed to add item');
       }
 
+      // Calculate new total: (current items + new item) + locked tax
+      const currentSubtotal = calculateSubtotal();
+      const newItemTotal = Math.round((parseFloat(itemForm.unitPrice) * (parseInt(itemForm.quantity) || 1) - (parseFloat(itemForm.discount) || 0)) * 100) / 100;
+      const newTotal = Math.round((currentSubtotal + newItemTotal + lockedTax) * 100) / 100;
+
+      // Update total on backend
+      await fetch(`${API_BASE_URL}/api/receipts/${id}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ totalAmount: newTotal }),
+      });
+
       // Refetch receipt to get updated items and total
       await fetchReceipt();
 
@@ -221,7 +244,7 @@ const ReceiptDetail: React.FC = () => {
         unitPrice: '',
         quantity: '1',
         discount: '0',
-        category: 'Groceries',
+        category: 'Uncategorized',
       });
       setAddingItem(false);
     } catch (err) {
@@ -312,7 +335,7 @@ const ReceiptDetail: React.FC = () => {
       unitPrice: String(item.unit_price),
       quantity: String(item.quantity),
       discount: String(item.discount || 0),
-      category: item.category || 'Groceries',
+      category: item.category || 'Uncategorized',
     });
   };
 
@@ -355,7 +378,30 @@ const ReceiptDetail: React.FC = () => {
         throw new Error('Failed to update item');
       }
 
-      // Refetch receipt to get updated items and total
+      // Fetch updated receipt data
+      const receiptResponse = await fetch(`${API_BASE_URL}/api/receipts/${id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      const receiptData = await receiptResponse.json();
+      const updatedItems = receiptData.receipt.items;
+
+      // Calculate new total: items + locked tax
+      const newSubtotal = updatedItems.reduce((sum: number, item: any) => sum + (Number(item.total_price) || 0), 0);
+      const newTotal = Math.round((newSubtotal + lockedTax) * 100) / 100;
+
+      // Update total on backend
+      await fetch(`${API_BASE_URL}/api/receipts/${id}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ totalAmount: newTotal }),
+      });
+
+      // Refetch to update UI
       await fetchReceipt();
       handleEditItemCancel();
     } catch (err) {
@@ -392,7 +438,30 @@ const ReceiptDetail: React.FC = () => {
         throw new Error('Failed to delete item');
       }
 
-      // Refetch receipt to get updated items and total
+      // Fetch updated receipt data
+      const receiptResponse = await fetch(`${API_BASE_URL}/api/receipts/${id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      const receiptData = await receiptResponse.json();
+      const updatedItems = receiptData.receipt.items;
+
+      // Calculate new total: items + locked tax
+      const newSubtotal = updatedItems.reduce((sum: number, item: any) => sum + (Number(item.total_price) || 0), 0);
+      const newTotal = Math.round((newSubtotal + lockedTax) * 100) / 100;
+
+      // Update total on backend
+      await fetch(`${API_BASE_URL}/api/receipts/${id}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ totalAmount: newTotal }),
+      });
+
+      // Refetch to update UI
       await fetchReceipt();
       setDeleteItemModalOpen(false);
       setItemToDelete(null);
@@ -415,10 +484,9 @@ const ReceiptDetail: React.FC = () => {
     return receipt.items.reduce((sum, item) => sum + (Number(item.total_price) || 0), 0);
   };
 
-  // Calculate tax as total minus subtotal
+  // Return locked tax value (stays constant when items change)
   const calculateTax = () => {
-    const subtotal = calculateSubtotal();
-    return Math.max(0, (Number(receipt?.total_amount) || 0) - subtotal);
+    return lockedTax;
   };
 
   // Total amount edit handlers
@@ -1162,7 +1230,7 @@ const ReceiptDetail: React.FC = () => {
                           unitPrice: '',
                           quantity: '1',
                           discount: '0',
-                          category: 'Groceries',
+                          category: 'Uncategorized',
                         });
                       }}
                       className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg font-medium transition-colors"
