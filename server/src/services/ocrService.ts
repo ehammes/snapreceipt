@@ -184,6 +184,12 @@ class OCRService {
       return result;
     }
 
+    // DEBUG: Log first 50 lines of extracted text
+    const debugLines = text.split('\n').slice(0, 50);
+    console.log('[OCR DEBUG] First 50 lines of extracted text:');
+    debugLines.forEach((line, idx) => console.log(`${idx}: ${line}`));
+    console.log('[OCR DEBUG] ---End of debug output---');
+
     const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
 
     // Extract store name - detect common stores
@@ -363,10 +369,15 @@ class OCRService {
     // Pattern for price line: price followed by optional tax code (A, E, F, etc.)
     const priceLineRegex = /^(\d+\.\d{2})\s*([A-Z])?\s*$/;
 
-    // Pattern for discount line: negative price like "8.00-A" or "800-A" (OCR may miss decimal)
-    // Matches at start of line OR at end of line (right-aligned on receipts)
-    // Captures: group 1 = amount (may or may not have decimal)
-    const discountLineRegex = /(\d+(?:\.\d{2})?)-\s*([A-Z])?\s*$/;
+    // Pattern for discount line - two formats:
+    // 1. Negative price: "8.00-A" or "1103106 5.00-"
+    // 2. Barcode/item format: "0000349046 /1103106" followed by price on same or next line
+    // Captures: group 1 = optional item number (from barcode line or prefix), group 2 = amount (may or may not have decimal), group 3 = optional tax code
+    const discountLineRegex = /(?:([$]?\d{4,7}[A-Z]?)\s+)?(\d+(?:\.\d{2})?)-\s*([A-Z])?\s*$/;
+
+    // Pattern for Costco-style discount with barcode: "0000349046 /1103106" or "0000349046 /1103106 5.00"
+    // Captures: group 1 = item number after slash, group 2 = optional price
+    const barcodeDiscountLineRegex = /^0{4,}\d+\s*\/\s*([$]?\d{4,7}[A-Z]?)(?:\s+(\d+\.\d{2}))?/;
 
     // Pattern for item with price on same line (with optional tax code prefix)
     // Note: $ can be OCR error for 8 or S
@@ -387,6 +398,14 @@ class OCRService {
     // Track discounts to apply to items (keyed by price order)
     const discountsByPriceOrder = new Map<number, number>();
 
+    // Track discounts by item number (for Costco-style receipts where discount line includes item number)
+    const discountsByItemNumber = new Map<string, number>();
+
+    // Track pending discount item numbers from barcode lines (e.g., "0000349046 /1103106")
+    // This is used when discount line appears later without item number
+    let pendingDiscountItemNumber: string | null = null;
+    let lastBarcodeItemNumber: string | null = null;
+
     // Helper function to apply pending discounts - stores them for later application to items
     const applyPendingDiscounts = (prices: Array<{ price: number; order: number }>) => {
       if (pendingDiscounts.length === 0 || prices.length === 0) return;
@@ -404,6 +423,11 @@ class OCRService {
       // Apply any pending discounts before matching
       applyPendingDiscounts(pendingPrices);
 
+      // DEBUG: Log matching info
+      console.log(`[OCR DEBUG] Matching ${pendingItems.length} items with ${pendingPrices.length} prices`);
+      console.log('[OCR DEBUG] Items:', pendingItems.map(i => `${i.itemNumber} ${i.name} (line ${i.order})`));
+      console.log('[OCR DEBUG] Prices:', pendingPrices.map(p => `$${p.price} (line ${p.order})`));
+
       // When we have equal counts, match in same order (FIFO)
       // Items and prices typically appear in the same order
       // (left column = items, right column = prices, both top to bottom)
@@ -411,8 +435,20 @@ class OCRService {
         for (let k = 0; k < pendingItems.length; k++) {
           const item = pendingItems[k];
           const priceInfo = pendingPrices[k];
-          const discount = discountsByPriceOrder.get(priceInfo.order) || 0;
+          // Check for discount by item number first, fallback to price order
+          const discountByItemNumber = discountsByItemNumber.get(item.itemNumber) || 0;
+          const discountByOrder = discountsByPriceOrder.get(priceInfo.order) || 0;
+          const discount = discountByItemNumber || discountByOrder;
           const totalPrice = Math.round((priceInfo.price - discount) * 100) / 100;
+
+          console.log(`[OCR DEBUG] Matched: ${item.itemNumber} ${item.name} -> $${priceInfo.price} (discount: $${discount})`);
+
+          // If we used discount by item number, remove it from map to prevent double application
+          if (discountByItemNumber > 0) {
+            discountsByItemNumber.delete(item.itemNumber);
+            console.log(`[OCR DEBUG] Removed discount from map for ${item.itemNumber} (already applied)`);
+          }
+
           rawItems.push({
             itemNumber: item.itemNumber,
             name: item.name,
@@ -430,8 +466,20 @@ class OCRService {
         while (pendingItems.length > 0 && pendingPrices.length > 0) {
           const item = pendingItems.shift()!;
           const priceInfo = pendingPrices.shift()!;
-          const discount = discountsByPriceOrder.get(priceInfo.order) || 0;
+          // Check for discount by item number first, fallback to price order
+          const discountByItemNumber = discountsByItemNumber.get(item.itemNumber) || 0;
+          const discountByOrder = discountsByPriceOrder.get(priceInfo.order) || 0;
+          const discount = discountByItemNumber || discountByOrder;
           const totalPrice = Math.round((priceInfo.price - discount) * 100) / 100;
+
+          console.log(`[OCR DEBUG] Matched (unequal): ${item.itemNumber} ${item.name} -> $${priceInfo.price} (discount: $${discount})`);
+
+          // If we used discount by item number, remove it from map to prevent double application
+          if (discountByItemNumber > 0) {
+            discountsByItemNumber.delete(item.itemNumber);
+            console.log(`[OCR DEBUG] Removed discount from map for ${item.itemNumber} (already applied)`);
+          }
+
           rawItems.push({
             itemNumber: item.itemNumber,
             name: item.name,
@@ -471,12 +519,43 @@ class OCRService {
 
       // Check if this is a line to skip but keep pending item
       if (skipButKeepPendingPatterns.some(pattern => pattern.test(line))) {
+        // Check for Costco-style barcode discount line: "0000349046 /1103106" or "0000349046 /1103106 5.00"
+        const barcodeDiscountMatch = line.match(barcodeDiscountLineRegex);
+        if (barcodeDiscountMatch) {
+          const itemNumber = barcodeDiscountMatch[1];
+          const price = barcodeDiscountMatch[2];
+
+          console.log(`[OCR DEBUG] Found barcode discount line for item ${itemNumber}${price ? ` with price $${price}` : ' (no price on same line)'}`);
+
+          if (price) {
+            // Price is on same line - apply discount immediately
+            const discount = parseFloat(price);
+            const existing = discountsByItemNumber.get(itemNumber) || 0;
+            discountsByItemNumber.set(itemNumber, existing + discount);
+            console.log(`[OCR DEBUG] Applied barcode discount $${discount} to item ${itemNumber}`);
+          } else {
+            // Barcode line without price - track it for later discount line
+            // The discount will appear in a later line ending with '-'
+            lastBarcodeItemNumber = itemNumber;
+            console.log(`[OCR DEBUG] Tracking barcode item ${itemNumber} for upcoming discount line`);
+          }
+          continue;
+        }
+
         // Before skipping, check if there's a discount at the end of the line (e.g., "0000349287 / 1316229 4.00-")
-        const endOfLineDiscountMatch = line.match(/(\d+\.\d{2})-\s*([A-Z])?\s*$/);
+        // This may also include item number: "1103106 5.00-"
+        const endOfLineDiscountMatch = line.match(/(?:([$]?\d{4,7}[A-Z]?)\s+)?(\d+\.\d{2})-\s*([A-Z])?\s*$/);
         if (endOfLineDiscountMatch) {
-          const discount = parseFloat(endOfLineDiscountMatch[1]);
-          // Apply discount to last raw item or buffer it
-          if (rawItems.length > 0) {
+          const itemNumber = endOfLineDiscountMatch[1];
+          const discount = parseFloat(endOfLineDiscountMatch[2]);
+
+          // If discount includes item number, store by item number
+          if (itemNumber) {
+            const existing = discountsByItemNumber.get(itemNumber) || 0;
+            discountsByItemNumber.set(itemNumber, existing + discount);
+          }
+          // Otherwise apply discount to last raw item or buffer it
+          else if (rawItems.length > 0) {
             const lastItem = rawItems[rawItems.length - 1];
             lastItem.discount = (lastItem.discount || 0) + discount;
             lastItem.totalPrice = Math.round((lastItem.unitPrice * lastItem.quantity - lastItem.discount) * 100) / 100;
@@ -496,6 +575,11 @@ class OCRService {
         matchPendingItemsAndPrices(); // Try to match before clearing
         pendingItems.length = 0;
         pendingPrices.length = 0;
+        // Also clear barcode item number when we hit skip patterns (moved to different section)
+        if (lastBarcodeItemNumber) {
+          console.log(`[OCR DEBUG] Clearing barcode item number ${lastBarcodeItemNumber} due to skip pattern`);
+          lastBarcodeItemNumber = null;
+        }
         continue;
       }
 
@@ -504,6 +588,14 @@ class OCRService {
       if (priceMatch) {
         const price = parseFloat(priceMatch[1]);
         if (price >= 0.01 && price < 10000) {
+          // Don't treat regular prices as discount amounts even if we saw a barcode line
+          // The barcode lines are just metadata - actual discounts come from lines ending with '-'
+          // Clear pendingDiscountItemNumber if we hit a regular price (it means the barcode was just metadata)
+          if (pendingDiscountItemNumber) {
+            console.log(`[OCR DEBUG] Clearing pending discount item number ${pendingDiscountItemNumber} - barcode was metadata only`);
+            pendingDiscountItemNumber = null;
+          }
+
           if (pendingItems.length > 0) {
             // Add to pending prices buffer
             pendingPrices.push({ price, order: i });
@@ -523,27 +615,45 @@ class OCRService {
       // Check for discount line
       const discountMatch = line.match(discountLineRegex);
       if (discountMatch) {
-        let discount = parseFloat(discountMatch[1]);
+        let itemNumber = discountMatch[1]; // May be undefined if no item number
+        let discount = parseFloat(discountMatch[2]);
         // If no decimal in original (e.g., "800" instead of "8.00"), divide by 100
-        if (!discountMatch[1].includes('.')) {
+        if (!discountMatch[2].includes('.')) {
           discount = discount / 100;
         }
 
-        // If we have pending prices, store discount for that price order
-        if (pendingPrices.length > 0) {
+        // If no item number in discount line, check if we have a tracked barcode item number
+        if (!itemNumber && lastBarcodeItemNumber) {
+          itemNumber = lastBarcodeItemNumber;
+          console.log(`[OCR DEBUG] Discount line $${discount} without item number - using tracked barcode item ${itemNumber}`);
+          lastBarcodeItemNumber = null; // Clear after using
+        }
+
+        // If discount line includes item number (or we got it from barcode), store it by item number
+        if (itemNumber) {
+          const existing = discountsByItemNumber.get(itemNumber) || 0;
+          discountsByItemNumber.set(itemNumber, existing + discount);
+          console.log(`[OCR DEBUG] Applied discount $${discount} to item ${itemNumber} by item number`);
+        }
+        // Otherwise use the old sequential logic
+        else if (pendingPrices.length > 0) {
+          // If we have pending prices, store discount for that price order
           const firstPrice = pendingPrices[0];
           const existing = discountsByPriceOrder.get(firstPrice.order) || 0;
           discountsByPriceOrder.set(firstPrice.order, existing + discount);
+          console.log(`[OCR DEBUG] Applied discount $${discount} to pending price order ${firstPrice.order}`);
         }
         // If items are pending but no prices yet, buffer the discount
         else if (pendingItems.length > 0) {
           pendingDiscounts.push({ discount, order: i });
+          console.log(`[OCR DEBUG] Buffered discount $${discount} for pending items`);
         }
         // If we have raw items, apply to last item
         else if (rawItems.length > 0) {
           const lastItem = rawItems[rawItems.length - 1];
           lastItem.discount = (lastItem.discount || 0) + discount;
           lastItem.totalPrice = Math.round((lastItem.unitPrice * lastItem.quantity - lastItem.discount) * 100) / 100;
+          console.log(`[OCR DEBUG] Applied discount $${discount} to last raw item ${lastItem.itemNumber}`);
         }
         continue;
       }
@@ -554,7 +664,16 @@ class OCRService {
         // First, resolve any pending items using orphanPrice if available
         if (pendingItems.length > 0 && orphanPrice) {
           const item = pendingItems.shift()!;
-          const discount = discountsByPriceOrder.get(orphanPrice.order) || 0;
+          // Check for discount by item number first, fallback to price order
+          const discountByItemNumber = discountsByItemNumber.get(item.itemNumber) || 0;
+          const discountByOrder = discountsByPriceOrder.get(orphanPrice.order) || 0;
+          const discount = discountByItemNumber || discountByOrder;
+
+          // If we used discount by item number, remove it from map to prevent double application
+          if (discountByItemNumber > 0) {
+            discountsByItemNumber.delete(item.itemNumber);
+          }
+
           rawItems.push({
             itemNumber: item.itemNumber,
             name: item.name,
@@ -572,13 +691,21 @@ class OCRService {
         const price = parseFloat(itemWithPriceMatch[3]);
 
         if (name.length >= 2 && price >= 0.01 && price < 10000) {
+          // Check for discount by item number
+          const discount = discountsByItemNumber.get(itemNumber) || 0;
+
+          // If we used discount by item number, remove it from map to prevent double application
+          if (discount > 0) {
+            discountsByItemNumber.delete(itemNumber);
+          }
+
           rawItems.push({
             itemNumber,
             name,
             unitPrice: price,
             quantity: 1,
-            discount: 0,
-            totalPrice: price,
+            discount: discount,
+            totalPrice: Math.round((price - discount) * 100) / 100,
             order: i,  // Use current line number as order
           });
         }
@@ -613,7 +740,16 @@ class OCRService {
     // Handle any remaining pending items using orphan price
     while (pendingItems.length > 0 && orphanPrice) {
       const item = pendingItems.shift()!;
-      const discount = discountsByPriceOrder.get(orphanPrice.order) || 0;
+      // Check for discount by item number first, fallback to price order
+      const discountByItemNumber = discountsByItemNumber.get(item.itemNumber) || 0;
+      const discountByOrder = discountsByPriceOrder.get(orphanPrice.order) || 0;
+      const discount = discountByItemNumber || discountByOrder;
+
+      // If we used discount by item number, remove it from map to prevent double application
+      if (discountByItemNumber > 0) {
+        discountsByItemNumber.delete(item.itemNumber);
+      }
+
       rawItems.push({
         itemNumber: item.itemNumber,
         name: item.name,
@@ -624,6 +760,18 @@ class OCRService {
         order: item.order,
       });
       orphanPrice = null;
+    }
+
+    // Apply any remaining discounts by item number to raw items
+    // This handles cases where discount appears after the item (e.g., Costco barcode discounts)
+    for (const item of rawItems) {
+      if (item.itemNumber && discountsByItemNumber.has(item.itemNumber)) {
+        const additionalDiscount = discountsByItemNumber.get(item.itemNumber)!;
+        item.discount = (item.discount || 0) + additionalDiscount;
+        item.totalPrice = Math.round((item.unitPrice * item.quantity - item.discount) * 100) / 100;
+        // Remove from map so it's not applied again during merge
+        discountsByItemNumber.delete(item.itemNumber);
+      }
     }
 
     // Merge duplicate items (same name + same price)
@@ -644,23 +792,6 @@ class OCRService {
       .trim();
   }
 
-  /**
-   * Check if a line looks like metadata rather than a product
-   */
-  private isMetadataLine(text: string): boolean {
-    const metadataPatterns = [
-      /^\d+\/\d+\/\d+/, // Dates
-      /^\d+:\d+/, // Times
-      /^[#*]+/, // Special characters
-      /^\d+\s+\d+\s+\d+/, // Multiple numbers (could be transaction info)
-      /REG(ISTER)?/i,
-      /CASHIER/i,
-      /OP(ERATOR)?(\s|$)/i,
-      /TRN/i,
-    ];
-
-    return metadataPatterns.some(pattern => pattern.test(text));
-  }
 
   /**
    * Extract total amount from receipt text
