@@ -1035,6 +1035,10 @@ const ReceiptDetail: React.FC = () => {
                                   min="0"
                                   value={editItemForm.unitPrice}
                                   onChange={(e) => setEditItemForm({ ...editItemForm, unitPrice: e.target.value })}
+                                  onBlur={(e) => {
+                                    const value = parseFloat(e.target.value) || 0;
+                                    setEditItemForm({ ...editItemForm, unitPrice: value.toFixed(2) });
+                                  }}
                                   className="w-full border border-gray-300 rounded-lg pl-5 pr-2 py-2 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 />
                               </div>
@@ -1059,6 +1063,10 @@ const ReceiptDetail: React.FC = () => {
                                   min="0"
                                   value={editItemForm.discount}
                                   onChange={(e) => setEditItemForm({ ...editItemForm, discount: e.target.value })}
+                                  onBlur={(e) => {
+                                    const value = parseFloat(e.target.value) || 0;
+                                    setEditItemForm({ ...editItemForm, discount: value.toFixed(2) });
+                                  }}
                                   className="w-full border border-gray-300 rounded-lg pl-5 pr-2 py-2 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 />
                               </div>
@@ -1183,6 +1191,10 @@ const ReceiptDetail: React.FC = () => {
                           min="0"
                           value={itemForm.unitPrice}
                           onChange={(e) => setItemForm({ ...itemForm, unitPrice: e.target.value })}
+                          onBlur={(e) => {
+                            const value = parseFloat(e.target.value) || 0;
+                            setItemForm({ ...itemForm, unitPrice: value.toFixed(2) });
+                          }}
                           placeholder="0.00"
                           className="w-full border border-gray-300 rounded-lg pl-6 pr-3 py-2 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         />
@@ -1208,6 +1220,10 @@ const ReceiptDetail: React.FC = () => {
                           min="0"
                           value={itemForm.discount}
                           onChange={(e) => setItemForm({ ...itemForm, discount: e.target.value })}
+                          onBlur={(e) => {
+                            const value = parseFloat(e.target.value) || 0;
+                            setItemForm({ ...itemForm, discount: value.toFixed(2) });
+                          }}
                           placeholder="0.00"
                           className="w-full border border-gray-300 rounded-lg pl-6 pr-3 py-2 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         />

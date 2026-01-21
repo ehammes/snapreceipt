@@ -409,6 +409,10 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
                                 min="0"
                                 value={item.unitPrice}
                                 onChange={(e) => updateItem(item.id, 'unitPrice', parseFloat(e.target.value) || 0)}
+                                onBlur={(e) => {
+                                  const value = parseFloat(e.target.value) || 0;
+                                  updateItem(item.id, 'unitPrice', parseFloat(value.toFixed(2)));
+                                }}
                                 className="w-full border border-gray-300 rounded pl-5 pr-2 py-1 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                               />
                             </div>
@@ -433,6 +437,10 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
                                 min="0"
                                 value={item.discount || 0}
                                 onChange={(e) => updateItem(item.id, 'discount', parseFloat(e.target.value) || 0)}
+                                onBlur={(e) => {
+                                  const value = parseFloat(e.target.value) || 0;
+                                  updateItem(item.id, 'discount', parseFloat(value.toFixed(2)));
+                                }}
                                 className="w-full border border-gray-300 rounded pl-5 pr-2 py-1 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                 placeholder="0.00"
                               />
@@ -505,6 +513,10 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
                             min="0"
                             value={newItem.unitPrice || ''}
                             onChange={(e) => setNewItem(prev => ({ ...prev, unitPrice: parseFloat(e.target.value) || 0 }))}
+                            onBlur={(e) => {
+                              const value = parseFloat(e.target.value) || 0;
+                              setNewItem(prev => ({ ...prev, unitPrice: parseFloat(value.toFixed(2)) }));
+                            }}
                             placeholder="0.00"
                             className="w-full border border-gray-300 rounded pl-5 pr-2 py-1 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                           />
@@ -530,6 +542,10 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
                             min="0"
                             value={newItem.discount || ''}
                             onChange={(e) => setNewItem(prev => ({ ...prev, discount: parseFloat(e.target.value) || 0 }))}
+                            onBlur={(e) => {
+                              const value = parseFloat(e.target.value) || 0;
+                              setNewItem(prev => ({ ...prev, discount: parseFloat(value.toFixed(2)) }));
+                            }}
                             placeholder="0.00"
                             className="w-full border border-gray-300 rounded pl-5 pr-2 py-1 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                           />
