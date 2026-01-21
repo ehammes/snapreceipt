@@ -444,38 +444,58 @@ class OCRService {
       // When we have equal counts, find optimal matching by trying different orderings
       // This handles cases where OCR reads items and prices in different orders
       if (pendingItems.length === pendingPrices.length) {
-        // Use greedy matching for all counts
-        // Process items in order of their minimum distance to any unused price
-        const usedItems = new Set<number>();
-        const usedPrices = new Set<number>();
-        const bestMatching: Array<{ itemIdx: number; priceIdx: number }> = [];
+        // Check if items and prices form consecutive blocks (common in Costco receipts)
+        // If all items come before all prices and they're relatively close, use sequential matching
+        const allItemsBeforePrices = pendingItems.every(item =>
+          pendingPrices.every(price => item.order < price.order)
+        );
+        const maxItemOrder = Math.max(...pendingItems.map(i => i.order));
+        const minPriceOrder = Math.min(...pendingPrices.map(p => p.order));
+        const blockGap = minPriceOrder - maxItemOrder;
+        const isConsecutiveBlock = allItemsBeforePrices && blockGap <= 3;
 
-        while (usedItems.size < pendingItems.length) {
-          let bestItemIdx = -1;
-          let bestPriceIdx = -1;
-          let bestDistance = Infinity;
+        let bestMatching: Array<{ itemIdx: number; priceIdx: number }> = [];
 
-          // Find the item-price pair with smallest distance
+        if (isConsecutiveBlock) {
+          // Sequential matching: match items to prices in order
+          // This handles Costco-style receipts where N items are followed by N prices
+          this.debug('[OCR DEBUG] Using sequential matching (consecutive block detected)');
           for (let i = 0; i < pendingItems.length; i++) {
-            if (usedItems.has(i)) continue;
+            bestMatching.push({ itemIdx: i, priceIdx: i });
+          }
+        } else {
+          // Use greedy matching for non-consecutive layouts
+          // Process items in order of their minimum distance to any unused price
+          const usedItems = new Set<number>();
+          const usedPrices = new Set<number>();
 
-            for (let j = 0; j < pendingPrices.length; j++) {
-              if (usedPrices.has(j)) continue;
-              const distance = Math.abs(pendingItems[i].order - pendingPrices[j].order);
-              if (distance < bestDistance) {
-                bestDistance = distance;
-                bestItemIdx = i;
-                bestPriceIdx = j;
+          while (usedItems.size < pendingItems.length) {
+            let bestItemIdx = -1;
+            let bestPriceIdx = -1;
+            let bestDistance = Infinity;
+
+            // Find the item-price pair with smallest distance
+            for (let i = 0; i < pendingItems.length; i++) {
+              if (usedItems.has(i)) continue;
+
+              for (let j = 0; j < pendingPrices.length; j++) {
+                if (usedPrices.has(j)) continue;
+                const distance = Math.abs(pendingItems[i].order - pendingPrices[j].order);
+                if (distance < bestDistance) {
+                  bestDistance = distance;
+                  bestItemIdx = i;
+                  bestPriceIdx = j;
+                }
               }
             }
-          }
 
-          if (bestItemIdx !== -1 && bestPriceIdx !== -1) {
-            usedItems.add(bestItemIdx);
-            usedPrices.add(bestPriceIdx);
-            bestMatching.push({ itemIdx: bestItemIdx, priceIdx: bestPriceIdx });
-          } else {
-            break;
+            if (bestItemIdx !== -1 && bestPriceIdx !== -1) {
+              usedItems.add(bestItemIdx);
+              usedPrices.add(bestPriceIdx);
+              bestMatching.push({ itemIdx: bestItemIdx, priceIdx: bestPriceIdx });
+            } else {
+              break;
+            }
           }
         }
 
