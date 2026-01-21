@@ -316,8 +316,12 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
                           type="number"
                           step="0.01"
                           min="0"
-                          value={subtotalOverride !== null ? subtotalOverride : calculateItemsTotal()}
+                          value={subtotalOverride !== null ? parseFloat(subtotalOverride).toFixed(2) : calculateItemsTotal().toFixed(2)}
                           onChange={(e) => handleSubtotalChange(e.target.value)}
+                          onBlur={(e) => {
+                            const value = parseFloat(e.target.value) || 0;
+                            handleSubtotalChange(value.toFixed(2));
+                          }}
                           className="w-full border border-gray-300 rounded-lg pl-6 pr-2 py-1.5 text-right text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         />
                       </div>
@@ -332,8 +336,12 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
                           type="number"
                           step="0.01"
                           min="0"
-                          value={taxOverride !== null ? taxOverride : getTax()}
+                          value={taxOverride !== null ? parseFloat(taxOverride).toFixed(2) : getTax().toFixed(2)}
                           onChange={(e) => handleTaxChange(e.target.value)}
+                          onBlur={(e) => {
+                            const value = parseFloat(e.target.value) || 0;
+                            handleTaxChange(value.toFixed(2));
+                          }}
                           className="w-full border border-gray-300 rounded-lg pl-6 pr-2 py-1.5 text-right text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         />
                       </div>
