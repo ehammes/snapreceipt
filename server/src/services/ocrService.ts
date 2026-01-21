@@ -355,7 +355,6 @@ class OCRService {
       /^[A-Z]\s+\d+\.?\d*%/i, // Tax rate lines like "A 7.5% Tax"
       /TOTAL\s*TAX/i,
       /TOTAL\s*NUMBER/i,
-      /Date\s*of\s*Birth/i,
       /^Name:/i,
       /^XX+/i, // Masked card numbers
       /\b(Street|St|Avenue|Ave|Boulevard|Blvd|Drive|Dr|Road|Rd|Way|Lane|Ln|Court|Ct|Place|Pl|Parkway|Pkwy|Highway|Hwy)\b/i, // Address lines
@@ -428,20 +427,57 @@ class OCRService {
       console.log('[OCR DEBUG] Items:', pendingItems.map(i => `${i.itemNumber} ${i.name} (line ${i.order})`));
       console.log('[OCR DEBUG] Prices:', pendingPrices.map(p => `$${p.price} (line ${p.order})`));
 
-      // When we have equal counts, match in same order (FIFO)
-      // Items and prices typically appear in the same order
-      // (left column = items, right column = prices, both top to bottom)
+      // When we have equal counts, find optimal matching by trying different orderings
+      // This handles cases where OCR reads items and prices in different orders
       if (pendingItems.length === pendingPrices.length) {
-        for (let k = 0; k < pendingItems.length; k++) {
-          const item = pendingItems[k];
-          const priceInfo = pendingPrices[k];
+        // Use greedy matching for all counts
+        // Process items in order of their minimum distance to any unused price
+        const usedItems = new Set<number>();
+        const usedPrices = new Set<number>();
+        const bestMatching: Array<{ itemIdx: number; priceIdx: number }> = [];
+
+        while (usedItems.size < pendingItems.length) {
+          let bestItemIdx = -1;
+          let bestPriceIdx = -1;
+          let bestDistance = Infinity;
+
+          // Find the item-price pair with smallest distance
+          for (let i = 0; i < pendingItems.length; i++) {
+            if (usedItems.has(i)) continue;
+
+            for (let j = 0; j < pendingPrices.length; j++) {
+              if (usedPrices.has(j)) continue;
+              const distance = Math.abs(pendingItems[i].order - pendingPrices[j].order);
+              if (distance < bestDistance) {
+                bestDistance = distance;
+                bestItemIdx = i;
+                bestPriceIdx = j;
+              }
+            }
+          }
+
+          if (bestItemIdx !== -1 && bestPriceIdx !== -1) {
+            usedItems.add(bestItemIdx);
+            usedPrices.add(bestPriceIdx);
+            bestMatching.push({ itemIdx: bestItemIdx, priceIdx: bestPriceIdx });
+          } else {
+            break;
+          }
+        }
+
+        // Apply the best matching
+        for (const { itemIdx, priceIdx } of bestMatching) {
+          const item = pendingItems[itemIdx];
+          const priceInfo = pendingPrices[priceIdx];
+
           // Check for discount by item number first, fallback to price order
           const discountByItemNumber = discountsByItemNumber.get(item.itemNumber) || 0;
           const discountByOrder = discountsByPriceOrder.get(priceInfo.order) || 0;
           const discount = discountByItemNumber || discountByOrder;
           const totalPrice = Math.round((priceInfo.price - discount) * 100) / 100;
 
-          console.log(`[OCR DEBUG] Matched: ${item.itemNumber} ${item.name} -> $${priceInfo.price} (discount: $${discount})`);
+          const distance = Math.abs(item.order - priceInfo.order);
+          console.log(`[OCR DEBUG] Matched (optimal): ${item.itemNumber} ${item.name} (line ${item.order}) -> $${priceInfo.price} (line ${priceInfo.order}, distance: ${distance}, discount: $${discount})`);
 
           // If we used discount by item number, remove it from map to prevent double application
           if (discountByItemNumber > 0) {
@@ -508,13 +544,15 @@ class OCRService {
         /^\d{10,}$/, // Long number-only lines (barcodes)
         /^[A-Z]$/, // Single letter lines (tax codes like "E" that got separated)
         /^[A-Z]{2,6}$/, // Multiple letter lines (tax codes like "EEE" or "EEEEEE")
-        /[^\x00-\x7F]/, // Lines with non-ASCII characters (OCR garbage like "ययययय")
+        /[^\x00-\x7F]/, // Lines with non-ASCII characters (OCR garbage like "యయயயய")
         /^SUBTOTAL$/i, // Subtotal marker (price may come after in OCR)
         /^TAX$/i, // Tax marker
         /^\*+\s*TOTAL/i, // Total marker
         /^XXXX+\d+/, // Masked card numbers
         /^AID:/i, // Card AID
         /^H$/, // Single H (often appears after card info)
+        /Date\s*of\s*Birth/i, // Date of birth verification lines (Costco alcohol purchases)
+        /KEYED/i, // Manual entry indicators
       ];
 
       // Check if this is a line to skip but keep pending item
