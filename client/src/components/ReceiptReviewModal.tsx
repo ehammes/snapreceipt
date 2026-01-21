@@ -316,13 +316,13 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
                           type="number"
                           step="0.01"
                           min="0"
-                          value={taxOverride !== null ? parseFloat(taxOverride).toFixed(2) : getTax().toFixed(2)}
+                          value={taxOverride !== null ? taxOverride : getTax()}
                           onChange={(e) => handleTaxChange(e.target.value)}
                           onBlur={(e) => {
                             const value = parseFloat(e.target.value) || 0;
                             handleTaxChange(value.toFixed(2));
                           }}
-                          className="w-full border border-gray-300 rounded-lg pl-6 pr-2 py-1.5 text-right text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          className="w-full border border-gray-300 rounded-lg pl-6 pr-2 py-1.5 text-right text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         />
                       </div>
                     </div>
