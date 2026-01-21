@@ -316,7 +316,7 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
                           type="number"
                           step="0.01"
                           min="0"
-                          value={subtotalOverride !== null ? subtotalOverride : calculateItemsTotal().toFixed(2)}
+                          value={subtotalOverride !== null ? subtotalOverride : calculateItemsTotal()}
                           onChange={(e) => handleSubtotalChange(e.target.value)}
                           className="w-full border border-gray-300 rounded-lg pl-6 pr-2 py-1.5 text-right text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         />
@@ -332,7 +332,7 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
                           type="number"
                           step="0.01"
                           min="0"
-                          value={taxOverride !== null ? taxOverride : getTax().toFixed(2)}
+                          value={taxOverride !== null ? taxOverride : getTax()}
                           onChange={(e) => handleTaxChange(e.target.value)}
                           className="w-full border border-gray-300 rounded-lg pl-6 pr-2 py-1.5 text-right text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         />
@@ -407,7 +407,7 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
                                 type="number"
                                 step="0.01"
                                 min="0"
-                                value={item.unitPrice.toFixed(2)}
+                                value={item.unitPrice}
                                 onChange={(e) => updateItem(item.id, 'unitPrice', parseFloat(e.target.value) || 0)}
                                 className="w-full border border-gray-300 rounded pl-5 pr-2 py-1 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                               />
@@ -431,7 +431,7 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
                                 type="number"
                                 step="0.01"
                                 min="0"
-                                value={(item.discount || 0).toFixed(2)}
+                                value={item.discount || 0}
                                 onChange={(e) => updateItem(item.id, 'discount', parseFloat(e.target.value) || 0)}
                                 className="w-full border border-gray-300 rounded pl-5 pr-2 py-1 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                 placeholder="0.00"
@@ -503,7 +503,7 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
                             type="number"
                             step="0.01"
                             min="0"
-                            value={newItem.unitPrice ? newItem.unitPrice.toFixed(2) : ''}
+                            value={newItem.unitPrice || ''}
                             onChange={(e) => setNewItem(prev => ({ ...prev, unitPrice: parseFloat(e.target.value) || 0 }))}
                             placeholder="0.00"
                             className="w-full border border-gray-300 rounded pl-5 pr-2 py-1 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
@@ -528,7 +528,7 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
                             type="number"
                             step="0.01"
                             min="0"
-                            value={newItem.discount ? newItem.discount.toFixed(2) : ''}
+                            value={newItem.discount || ''}
                             onChange={(e) => setNewItem(prev => ({ ...prev, discount: parseFloat(e.target.value) || 0 }))}
                             placeholder="0.00"
                             className="w-full border border-gray-300 rounded pl-5 pr-2 py-1 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"

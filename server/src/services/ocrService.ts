@@ -120,8 +120,11 @@ export interface ParsedReceiptData {
 
 class OCRService {
   private visionClient: ImageAnnotatorClient;
+  private debugEnabled: boolean;
 
   constructor() {
+    // Enable debug logging in development or when OCR_DEBUG is set
+    this.debugEnabled = process.env.NODE_ENV === 'development' || process.env.OCR_DEBUG === 'true';
     try {
       // Support both file path (local dev) and JSON string (production/Railway)
       if (process.env.GOOGLE_CREDENTIALS_JSON) {
@@ -139,6 +142,15 @@ class OCRService {
     } catch (error) {
       console.error('Failed to initialize Google Vision API client:', error);
       throw new Error('Failed to initialize OCR service');
+    }
+  }
+
+  /**
+   * Helper method for debug logging
+   */
+  private debug(...args: any[]): void {
+    if (this.debugEnabled) {
+      console.log(...args);
     }
   }
 
@@ -185,10 +197,12 @@ class OCRService {
     }
 
     // DEBUG: Log first 50 lines of extracted text
-    const debugLines = text.split('\n').slice(0, 50);
-    console.log('[OCR DEBUG] First 50 lines of extracted text:');
-    debugLines.forEach((line, idx) => console.log(`${idx}: ${line}`));
-    console.log('[OCR DEBUG] ---End of debug output---');
+    if (this.debugEnabled) {
+      const debugLines = text.split('\n').slice(0, 50);
+      this.debug('[OCR DEBUG] First 50 lines of extracted text:');
+      debugLines.forEach((line, idx) => this.debug(`${idx}: ${line}`));
+      this.debug('[OCR DEBUG] ---End of debug output---');
+    }
 
     const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
 
@@ -423,9 +437,9 @@ class OCRService {
       applyPendingDiscounts(pendingPrices);
 
       // DEBUG: Log matching info
-      console.log(`[OCR DEBUG] Matching ${pendingItems.length} items with ${pendingPrices.length} prices`);
-      console.log('[OCR DEBUG] Items:', pendingItems.map(i => `${i.itemNumber} ${i.name} (line ${i.order})`));
-      console.log('[OCR DEBUG] Prices:', pendingPrices.map(p => `$${p.price} (line ${p.order})`));
+      this.debug(`[OCR DEBUG] Matching ${pendingItems.length} items with ${pendingPrices.length} prices`);
+      this.debug('[OCR DEBUG] Items:', pendingItems.map(i => `${i.itemNumber} ${i.name} (line ${i.order})`));
+      this.debug('[OCR DEBUG] Prices:', pendingPrices.map(p => `$${p.price} (line ${p.order})`));
 
       // When we have equal counts, find optimal matching by trying different orderings
       // This handles cases where OCR reads items and prices in different orders
@@ -477,12 +491,12 @@ class OCRService {
           const totalPrice = Math.round((priceInfo.price - discount) * 100) / 100;
 
           const distance = Math.abs(item.order - priceInfo.order);
-          console.log(`[OCR DEBUG] Matched (optimal): ${item.itemNumber} ${item.name} (line ${item.order}) -> $${priceInfo.price} (line ${priceInfo.order}, distance: ${distance}, discount: $${discount})`);
+          this.debug(`[OCR DEBUG] Matched (optimal): ${item.itemNumber} ${item.name} (line ${item.order}) -> $${priceInfo.price} (line ${priceInfo.order}, distance: ${distance}, discount: $${discount})`);
 
           // If we used discount by item number, remove it from map to prevent double application
           if (discountByItemNumber > 0) {
             discountsByItemNumber.delete(item.itemNumber);
-            console.log(`[OCR DEBUG] Removed discount from map for ${item.itemNumber} (already applied)`);
+            this.debug(`[OCR DEBUG] Removed discount from map for ${item.itemNumber} (already applied)`);
           }
 
           rawItems.push({
@@ -508,12 +522,12 @@ class OCRService {
           const discount = discountByItemNumber || discountByOrder;
           const totalPrice = Math.round((priceInfo.price - discount) * 100) / 100;
 
-          console.log(`[OCR DEBUG] Matched (unequal): ${item.itemNumber} ${item.name} -> $${priceInfo.price} (discount: $${discount})`);
+          this.debug(`[OCR DEBUG] Matched (unequal): ${item.itemNumber} ${item.name} -> $${priceInfo.price} (discount: $${discount})`);
 
           // If we used discount by item number, remove it from map to prevent double application
           if (discountByItemNumber > 0) {
             discountsByItemNumber.delete(item.itemNumber);
-            console.log(`[OCR DEBUG] Removed discount from map for ${item.itemNumber} (already applied)`);
+            this.debug(`[OCR DEBUG] Removed discount from map for ${item.itemNumber} (already applied)`);
           }
 
           rawItems.push({
@@ -563,19 +577,19 @@ class OCRService {
           const itemNumber = barcodeDiscountMatch[1];
           const price = barcodeDiscountMatch[2];
 
-          console.log(`[OCR DEBUG] Found barcode discount line for item ${itemNumber}${price ? ` with price $${price}` : ' (no price on same line)'}`);
+          this.debug(`[OCR DEBUG] Found barcode discount line for item ${itemNumber}${price ? ` with price $${price}` : ' (no price on same line)'}`);
 
           if (price) {
             // Price is on same line - apply discount immediately
             const discount = parseFloat(price);
             const existing = discountsByItemNumber.get(itemNumber) || 0;
             discountsByItemNumber.set(itemNumber, existing + discount);
-            console.log(`[OCR DEBUG] Applied barcode discount $${discount} to item ${itemNumber}`);
+            this.debug(`[OCR DEBUG] Applied barcode discount $${discount} to item ${itemNumber}`);
           } else {
             // Barcode line without price - track it for later discount line
             // The discount will appear in a later line ending with '-'
             lastBarcodeItemNumber = itemNumber;
-            console.log(`[OCR DEBUG] Tracking barcode item ${itemNumber} for upcoming discount line`);
+            this.debug(`[OCR DEBUG] Tracking barcode item ${itemNumber} for upcoming discount line`);
           }
           continue;
         }
@@ -615,7 +629,7 @@ class OCRService {
         pendingPrices.length = 0;
         // Also clear barcode item number when we hit skip patterns (moved to different section)
         if (lastBarcodeItemNumber) {
-          console.log(`[OCR DEBUG] Clearing barcode item number ${lastBarcodeItemNumber} due to skip pattern`);
+          this.debug(`[OCR DEBUG] Clearing barcode item number ${lastBarcodeItemNumber} due to skip pattern`);
           lastBarcodeItemNumber = null;
         }
         continue;
@@ -630,7 +644,7 @@ class OCRService {
           // The barcode lines are just metadata - actual discounts come from lines ending with '-'
           // Clear pendingDiscountItemNumber if we hit a regular price (it means the barcode was just metadata)
           if (pendingDiscountItemNumber) {
-            console.log(`[OCR DEBUG] Clearing pending discount item number ${pendingDiscountItemNumber} - barcode was metadata only`);
+            this.debug(`[OCR DEBUG] Clearing pending discount item number ${pendingDiscountItemNumber} - barcode was metadata only`);
             pendingDiscountItemNumber = null;
           }
 
@@ -663,7 +677,7 @@ class OCRService {
         // If no item number in discount line, check if we have a tracked barcode item number
         if (!itemNumber && lastBarcodeItemNumber) {
           itemNumber = lastBarcodeItemNumber;
-          console.log(`[OCR DEBUG] Discount line $${discount} without item number - using tracked barcode item ${itemNumber}`);
+          this.debug(`[OCR DEBUG] Discount line $${discount} without item number - using tracked barcode item ${itemNumber}`);
           lastBarcodeItemNumber = null; // Clear after using
         }
 
@@ -671,7 +685,7 @@ class OCRService {
         if (itemNumber) {
           const existing = discountsByItemNumber.get(itemNumber) || 0;
           discountsByItemNumber.set(itemNumber, existing + discount);
-          console.log(`[OCR DEBUG] Applied discount $${discount} to item ${itemNumber} by item number`);
+          this.debug(`[OCR DEBUG] Applied discount $${discount} to item ${itemNumber} by item number`);
         }
         // Otherwise use the old sequential logic
         else if (pendingPrices.length > 0) {
@@ -679,19 +693,19 @@ class OCRService {
           const firstPrice = pendingPrices[0];
           const existing = discountsByPriceOrder.get(firstPrice.order) || 0;
           discountsByPriceOrder.set(firstPrice.order, existing + discount);
-          console.log(`[OCR DEBUG] Applied discount $${discount} to pending price order ${firstPrice.order}`);
+          this.debug(`[OCR DEBUG] Applied discount $${discount} to pending price order ${firstPrice.order}`);
         }
         // If items are pending but no prices yet, buffer the discount
         else if (pendingItems.length > 0) {
           pendingDiscounts.push({ discount, order: i });
-          console.log(`[OCR DEBUG] Buffered discount $${discount} for pending items`);
+          this.debug(`[OCR DEBUG] Buffered discount $${discount} for pending items`);
         }
         // If we have raw items, apply to last item
         else if (rawItems.length > 0) {
           const lastItem = rawItems[rawItems.length - 1];
           lastItem.discount = (lastItem.discount || 0) + discount;
           lastItem.totalPrice = Math.round((lastItem.unitPrice * lastItem.quantity - lastItem.discount) * 100) / 100;
-          console.log(`[OCR DEBUG] Applied discount $${discount} to last raw item ${lastItem.itemNumber}`);
+          this.debug(`[OCR DEBUG] Applied discount $${discount} to last raw item ${lastItem.itemNumber}`);
         }
         continue;
       }

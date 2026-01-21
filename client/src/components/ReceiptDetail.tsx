@@ -1033,7 +1033,7 @@ const ReceiptDetail: React.FC = () => {
                                   type="number"
                                   step="0.01"
                                   min="0"
-                                  value={parseFloat(editItemForm.unitPrice || '0').toFixed(2)}
+                                  value={editItemForm.unitPrice}
                                   onChange={(e) => setEditItemForm({ ...editItemForm, unitPrice: e.target.value })}
                                   className="w-full border border-gray-300 rounded-lg pl-5 pr-2 py-2 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 />
@@ -1057,7 +1057,7 @@ const ReceiptDetail: React.FC = () => {
                                   type="number"
                                   step="0.01"
                                   min="0"
-                                  value={parseFloat(editItemForm.discount || '0').toFixed(2)}
+                                  value={editItemForm.discount}
                                   onChange={(e) => setEditItemForm({ ...editItemForm, discount: e.target.value })}
                                   className="w-full border border-gray-300 rounded-lg pl-5 pr-2 py-2 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 />
@@ -1181,7 +1181,7 @@ const ReceiptDetail: React.FC = () => {
                           type="number"
                           step="0.01"
                           min="0"
-                          value={itemForm.unitPrice ? parseFloat(itemForm.unitPrice).toFixed(2) : ''}
+                          value={itemForm.unitPrice}
                           onChange={(e) => setItemForm({ ...itemForm, unitPrice: e.target.value })}
                           placeholder="0.00"
                           className="w-full border border-gray-300 rounded-lg pl-6 pr-3 py-2 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -1206,7 +1206,7 @@ const ReceiptDetail: React.FC = () => {
                           type="number"
                           step="0.01"
                           min="0"
-                          value={parseFloat(itemForm.discount || '0').toFixed(2)}
+                          value={itemForm.discount}
                           onChange={(e) => setItemForm({ ...itemForm, discount: e.target.value })}
                           placeholder="0.00"
                           className="w-full border border-gray-300 rounded-lg pl-6 pr-3 py-2 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
