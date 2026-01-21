@@ -38,6 +38,7 @@ interface StoreForm {
 }
 
 interface ItemForm {
+  itemNumber: string;
   name: string;
   unitPrice: string;
   quantity: string;
@@ -68,6 +69,7 @@ const ReceiptDetail: React.FC = () => {
   });
 
   const [itemForm, setItemForm] = useState<ItemForm>({
+    itemNumber: '',
     name: '',
     unitPrice: '',
     quantity: '1',
@@ -83,6 +85,7 @@ const ReceiptDetail: React.FC = () => {
   // Item edit/delete state
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editItemForm, setEditItemForm] = useState<ItemForm>({
+    itemNumber: '',
     name: '',
     unitPrice: '',
     quantity: '1',
@@ -208,6 +211,7 @@ const ReceiptDetail: React.FC = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          itemNumber: itemForm.itemNumber,
           name: itemForm.name,
           unitPrice: parseFloat(itemForm.unitPrice),
           quantity: parseInt(itemForm.quantity) || 1,
@@ -240,6 +244,7 @@ const ReceiptDetail: React.FC = () => {
 
       // Reset form and close
       setItemForm({
+        itemNumber: '',
         name: '',
         unitPrice: '',
         quantity: '1',
@@ -331,6 +336,7 @@ const ReceiptDetail: React.FC = () => {
   const handleEditItemClick = (item: ReceiptItem) => {
     setEditingItemId(item.id);
     setEditItemForm({
+      itemNumber: item.item_number || '',
       name: item.name,
       unitPrice: String(item.unit_price),
       quantity: String(item.quantity),
@@ -342,6 +348,7 @@ const ReceiptDetail: React.FC = () => {
   const handleEditItemCancel = () => {
     setEditingItemId(null);
     setEditItemForm({
+      itemNumber: '',
       name: '',
       unitPrice: '',
       quantity: '1',
@@ -365,6 +372,7 @@ const ReceiptDetail: React.FC = () => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
+            itemNumber: editItemForm.itemNumber,
             name: editItemForm.name,
             unitPrice: parseFloat(editItemForm.unitPrice),
             quantity: parseInt(editItemForm.quantity) || 1,
@@ -499,14 +507,7 @@ const ReceiptDetail: React.FC = () => {
     setEditingTotal(true);
   };
 
-  // Update total when subtotal or tax changes
-  const handleSubtotalChange = (value: string) => {
-    setSubtotalForm(value);
-    const subtotal = parseFloat(value) || 0;
-    const tax = parseFloat(taxForm) || 0;
-    setTotalForm((subtotal + tax).toFixed(2));
-  };
-
+  // Update total when tax changes
   const handleTaxChange = (value: string) => {
     setTaxForm(value);
     const subtotal = parseFloat(subtotalForm) || 0;
@@ -1011,14 +1012,26 @@ const ReceiptDetail: React.FC = () => {
                       {editingItemId === item.id ? (
                         // Edit Mode
                         <div className="space-y-3">
-                          <div>
-                            <label className="block text-xs text-gray-500 mb-1">Item Name</label>
-                            <input
-                              type="text"
-                              value={editItemForm.name}
-                              onChange={(e) => setEditItemForm({ ...editItemForm, name: e.target.value })}
-                              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            />
+                          <div className="grid grid-cols-4 gap-2">
+                            <div>
+                              <label className="block text-xs text-gray-500 mb-1">Product ID</label>
+                              <input
+                                type="text"
+                                value={editItemForm.itemNumber}
+                                onChange={(e) => setEditItemForm({ ...editItemForm, itemNumber: e.target.value })}
+                                placeholder="Optional"
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              />
+                            </div>
+                            <div className="col-span-3">
+                              <label className="block text-xs text-gray-500 mb-1">Item Name</label>
+                              <input
+                                type="text"
+                                value={editItemForm.name}
+                                onChange={(e) => setEditItemForm({ ...editItemForm, name: e.target.value })}
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              />
+                            </div>
                           </div>
                           <div className="grid grid-cols-8 gap-2">
                             <div className="col-span-2">
@@ -1166,15 +1179,27 @@ const ReceiptDetail: React.FC = () => {
               {/* Add Item Form */}
               {addingItem ? (
                 <div className="border-t border-gray-200 pt-4 space-y-4">
-                  <div>
-                    <label className="block text-sm text-gray-600 mb-1">Item Name</label>
-                    <input
-                      type="text"
-                      value={itemForm.name}
-                      onChange={(e) => setItemForm({ ...itemForm, name: e.target.value })}
-                      placeholder="Enter item name"
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
+                  <div className="grid grid-cols-4 gap-4">
+                    <div>
+                      <label className="block text-sm text-gray-600 mb-1">Product ID</label>
+                      <input
+                        type="text"
+                        value={itemForm.itemNumber}
+                        onChange={(e) => setItemForm({ ...itemForm, itemNumber: e.target.value })}
+                        placeholder="Optional"
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+                    <div className="col-span-3">
+                      <label className="block text-sm text-gray-600 mb-1">Item Name</label>
+                      <input
+                        type="text"
+                        value={itemForm.name}
+                        onChange={(e) => setItemForm({ ...itemForm, name: e.target.value })}
+                        placeholder="Enter item name"
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
                   </div>
                   <div className="grid grid-cols-3 gap-4">
                     <div>
@@ -1252,6 +1277,7 @@ const ReceiptDetail: React.FC = () => {
                       onClick={() => {
                         setAddingItem(false);
                         setItemForm({
+                          itemNumber: '',
                           name: '',
                           unitPrice: '',
                           quantity: '1',
