@@ -54,7 +54,8 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
   // Lock in initial tax amount on first render (stays constant unless manually edited)
   const [initialTax] = useState<number>(() => {
     const itemsTotal = data.items.reduce((sum, item) => sum + (Number(item.totalPrice) || 0), 0);
-    return Math.max(0, data.totalAmount - itemsTotal);
+    const calculatedTax = Math.max(0, data.totalAmount - itemsTotal);
+    return Math.round(calculatedTax * 100) / 100; // Round to 2 decimal places
   });
 
   // Separate state for subtotal and tax to allow manual override
@@ -167,7 +168,8 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
   // Get effective tax (override or locked initial value)
   const getTax = () => {
     if (taxOverride !== null) {
-      return parseFloat(taxOverride) || 0;
+      const value = parseFloat(taxOverride) || 0;
+      return Math.round(value * 100) / 100; // Round to 2 decimal places
     }
     return initialTax;
   };

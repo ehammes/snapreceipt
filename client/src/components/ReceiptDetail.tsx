@@ -142,7 +142,7 @@ const ReceiptDetail: React.FC = () => {
       // Lock in the initial tax amount (Total - Items)
       const itemsTotal = receiptData.items?.reduce((sum: number, item: any) => sum + (Number(item.total_price) || 0), 0) || 0;
       const initialTax = Math.max(0, (Number(receiptData.total_amount) || 0) - itemsTotal);
-      setLockedTax(initialTax);
+      setLockedTax(Math.round(initialTax * 100) / 100); // Round to 2 decimal places
 
       // Initialize store form with receipt data
       setStoreForm({
