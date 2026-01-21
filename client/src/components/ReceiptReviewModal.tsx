@@ -172,14 +172,6 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
     return initialTax;
   };
 
-  // Handle subtotal change - update total automatically
-  const handleSubtotalChange = (value: string) => {
-    setSubtotalOverride(value);
-    const subtotal = parseFloat(value) || 0;
-    const tax = getTax();
-    setFormData(prev => ({ ...prev, totalAmount: subtotal + tax }));
-  };
-
   // Handle tax change - update total automatically
   const handleTaxChange = (value: string) => {
     setTaxOverride(value);
@@ -304,27 +296,15 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
                 {/* Subtotal, Tax, Total Breakdown */}
                 <div className="bg-white rounded-lg p-4 border border-gray-200">
                   <div className="space-y-3">
-                    {/* Editable Subtotal */}
+                    {/* Subtotal - calculated from items */}
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <span className="text-gray-600">Subtotal</span>
                         <span className="text-xs text-gray-400">(items: {formatCurrency(calculateItemsTotal())})</span>
                       </div>
-                      <div className="relative w-28">
-                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={subtotalOverride !== null ? parseFloat(subtotalOverride).toFixed(2) : calculateItemsTotal().toFixed(2)}
-                          onChange={(e) => handleSubtotalChange(e.target.value)}
-                          onBlur={(e) => {
-                            const value = parseFloat(e.target.value) || 0;
-                            handleSubtotalChange(value.toFixed(2));
-                          }}
-                          className="w-full border border-gray-300 rounded-lg pl-6 pr-2 py-1.5 text-right text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        />
-                      </div>
+                      <span className="text-gray-700 font-medium">
+                        {formatCurrency(getSubtotal())}
+                      </span>
                     </div>
 
                     {/* Editable Tax */}

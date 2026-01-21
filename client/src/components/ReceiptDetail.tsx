@@ -876,22 +876,14 @@ const ReceiptDetail: React.FC = () => {
                       )}
                     </div>
                     {editingTotal ? (
-                      // Edit Mode - all fields editable
+                      // Edit Mode - subtotal calculated, tax editable
                       <div className="space-y-3">
-                        {/* Editable Subtotal */}
+                        {/* Subtotal - calculated from items */}
                         <div className="flex items-center justify-between">
                           <span className="text-gray-500 text-sm">Subtotal</span>
-                          <div className="relative w-28">
-                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
-                            <input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              value={subtotalForm}
-                              onChange={(e) => handleSubtotalChange(e.target.value)}
-                              className="w-full border border-gray-300 rounded-lg pl-6 pr-2 py-1.5 text-right text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            />
-                          </div>
+                          <span className="text-gray-700 font-medium">
+                            {formatCurrency(parseFloat(subtotalForm))}
+                          </span>
                         </div>
 
                         {/* Editable Tax */}
@@ -903,8 +895,12 @@ const ReceiptDetail: React.FC = () => {
                               type="number"
                               step="0.01"
                               min="0"
-                              value={taxForm}
+                              value={parseFloat(taxForm).toFixed(2)}
                               onChange={(e) => handleTaxChange(e.target.value)}
+                              onBlur={(e) => {
+                                const value = parseFloat(e.target.value) || 0;
+                                handleTaxChange(value.toFixed(2));
+                              }}
                               className="w-full border border-gray-300 rounded-lg pl-6 pr-2 py-1.5 text-right text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                             />
                           </div>
