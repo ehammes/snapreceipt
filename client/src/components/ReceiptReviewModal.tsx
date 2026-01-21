@@ -401,13 +401,17 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
                         <div className="grid grid-cols-2 sm:grid-cols-6 gap-2 items-end">
                           <div>
                             <label className="block text-xs text-gray-500 mb-1">Unit Price</label>
-                            <input
-                              type="number"
-                              step="0.01"
-                              value={item.unitPrice}
-                              onChange={(e) => updateItem(item.id, 'unitPrice', parseFloat(e.target.value) || 0)}
-                              className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
-                            />
+                            <div className="relative">
+                              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={item.unitPrice.toFixed(2)}
+                                onChange={(e) => updateItem(item.id, 'unitPrice', parseFloat(e.target.value) || 0)}
+                                className="w-full border border-gray-300 rounded pl-5 pr-2 py-1 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                              />
+                            </div>
                           </div>
                           <div>
                             <label className="block text-xs text-gray-500 mb-1">Quantity</label>
@@ -421,15 +425,18 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
                           </div>
                           <div>
                             <label className="block text-xs text-gray-500 mb-1">Discount</label>
-                            <input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              value={item.discount || 0}
-                              onChange={(e) => updateItem(item.id, 'discount', parseFloat(e.target.value) || 0)}
-                              className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
-                              placeholder="0.00"
-                            />
+                            <div className="relative">
+                              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={(item.discount || 0).toFixed(2)}
+                                onChange={(e) => updateItem(item.id, 'discount', parseFloat(e.target.value) || 0)}
+                                className="w-full border border-gray-300 rounded pl-5 pr-2 py-1 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                placeholder="0.00"
+                              />
+                            </div>
                           </div>
                           <div className="sm:col-span-2">
                             <label className="block text-xs text-gray-500 mb-1">Category</label>
@@ -490,14 +497,18 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
                     <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                       <div>
                         <label className="block text-xs text-gray-500 mb-1">Unit Price *</label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={newItem.unitPrice || ''}
-                          onChange={(e) => setNewItem(prev => ({ ...prev, unitPrice: parseFloat(e.target.value) || 0 }))}
-                          placeholder="0.00"
-                          className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
-                        />
+                        <div className="relative">
+                          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={newItem.unitPrice ? newItem.unitPrice.toFixed(2) : ''}
+                            onChange={(e) => setNewItem(prev => ({ ...prev, unitPrice: parseFloat(e.target.value) || 0 }))}
+                            placeholder="0.00"
+                            className="w-full border border-gray-300 rounded pl-5 pr-2 py-1 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          />
+                        </div>
                       </div>
                       <div>
                         <label className="block text-xs text-gray-500 mb-1">Quantity</label>
@@ -511,15 +522,18 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
                       </div>
                       <div>
                         <label className="block text-xs text-gray-500 mb-1">Discount</label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={newItem.discount || ''}
-                          onChange={(e) => setNewItem(prev => ({ ...prev, discount: parseFloat(e.target.value) || 0 }))}
-                          placeholder="0.00"
-                          className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
-                        />
+                        <div className="relative">
+                          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={newItem.discount ? newItem.discount.toFixed(2) : ''}
+                            onChange={(e) => setNewItem(prev => ({ ...prev, discount: parseFloat(e.target.value) || 0 }))}
+                            placeholder="0.00"
+                            className="w-full border border-gray-300 rounded pl-5 pr-2 py-1 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          />
+                        </div>
                       </div>
                       <div className="sm:col-span-2">
                         <label className="block text-xs text-gray-500 mb-1">Category</label>
