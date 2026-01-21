@@ -1024,8 +1024,8 @@ const ReceiptDetail: React.FC = () => {
                               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                             />
                           </div>
-                          <div className="grid grid-cols-4 gap-2">
-                            <div>
+                          <div className="grid grid-cols-8 gap-2">
+                            <div className="col-span-2">
                               <label className="block text-xs text-gray-500 mb-1">Unit Price</label>
                               <div className="relative">
                                 <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
@@ -1039,7 +1039,7 @@ const ReceiptDetail: React.FC = () => {
                                 />
                               </div>
                             </div>
-                            <div>
+                            <div className="col-span-1">
                               <label className="block text-xs text-gray-500 mb-1">Quantity</label>
                               <input
                                 type="number"
@@ -1049,7 +1049,7 @@ const ReceiptDetail: React.FC = () => {
                                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                               />
                             </div>
-                            <div>
+                            <div className="col-span-2">
                               <label className="block text-xs text-gray-500 mb-1">Discount</label>
                               <div className="relative">
                                 <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
@@ -1063,7 +1063,7 @@ const ReceiptDetail: React.FC = () => {
                                 />
                               </div>
                             </div>
-                            <div>
+                            <div className="col-span-3">
                               <label className="block text-xs text-gray-500 mb-1">Category</label>
                               <select
                                 value={editItemForm.category}
