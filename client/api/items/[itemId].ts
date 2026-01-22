@@ -35,7 +35,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (req.method === 'PUT') {
-      const { name, unitPrice, quantity, discount, category } = req.body;
+      const { name, unitPrice, quantity, discount, category, itemNumber } = req.body;
       const existingItem = itemCheck.rows[0];
 
       const updates: string[] = [];
@@ -47,6 +47,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (quantity !== undefined) { updates.push(`quantity = $${paramIndex++}`); values.push(parseInt(quantity)); }
       if (discount !== undefined) { updates.push(`discount = $${paramIndex++}`); values.push(parseFloat(discount)); }
       if (category !== undefined) { updates.push(`category = $${paramIndex++}`); values.push(category || null); }
+      if (itemNumber !== undefined) { updates.push(`item_number = $${paramIndex++}`); values.push(itemNumber || null); }
 
       // Calculate new total
       const newUnitPrice = unitPrice !== undefined ? parseFloat(unitPrice) : existingItem.unit_price;

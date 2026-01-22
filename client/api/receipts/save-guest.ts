@@ -42,9 +42,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       for (let i = 0; i < items.length; i++) {
         const item = items[i];
         await pool.query(
-          `INSERT INTO items (receipt_id, name, unit_price, quantity, total_price, category, item_order, item_number)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-          [receipt.id, item.name || '', item.unitPrice || 0, item.quantity || 1, item.totalPrice || 0, item.category || null, item.item_order ?? i, item.itemNumber || null]
+          `INSERT INTO items (receipt_id, name, unit_price, quantity, discount, total_price, category, item_order, item_number)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+          [receipt.id, item.name || '', item.unitPrice || 0, item.quantity || 1, item.discount || 0, item.totalPrice || 0, item.category || null, item.item_order ?? i, item.itemNumber || null]
         );
       }
     }

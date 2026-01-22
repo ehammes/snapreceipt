@@ -17,7 +17,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const id = receiptId;
 
   try {
-    const { name, unitPrice, quantity, category } = req.body;
+    const { name, unitPrice, quantity, discount, category, itemNumber } = req.body;
 
     if (!name || unitPrice === undefined || quantity === undefined) {
       return res.status(400).json({ error: 'Name, unitPrice, and quantity are required' });
@@ -32,12 +32,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(404).json({ error: 'Receipt not found' });
     }
 
-    const totalPrice = parseFloat(unitPrice) * parseInt(quantity);
+    const discountValue = parseFloat(discount) || 0;
+    const totalPrice = parseFloat(unitPrice) * parseInt(quantity) - discountValue;
 
     const result = await pool.query(
-      `INSERT INTO items (receipt_id, name, unit_price, quantity, total_price, category)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [id, name, parseFloat(unitPrice), parseInt(quantity), totalPrice, category || null]
+      `INSERT INTO items (receipt_id, name, unit_price, quantity, discount, total_price, category, item_number)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+      [id, name, parseFloat(unitPrice), parseInt(quantity), discountValue, totalPrice, category || null, itemNumber || null]
     );
 
     const itemsResult = await pool.query(
