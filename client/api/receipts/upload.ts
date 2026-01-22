@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import pool from '../lib/db';
 import { verifyToken } from '../lib/auth';
-import { processReceipt } from '../lib/ocr';
+import { processReceipt } from '../lib/ocrService';
 
 export const config = {
   api: {
