@@ -76,9 +76,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       for (let i = 0; i < ocrData.items.length; i++) {
         const item = ocrData.items[i];
         const result = await pool.query(
-          `INSERT INTO items (receipt_id, name, unit_price, quantity, total_price, category, item_order, item_number)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
-          [receipt.id, item.name, item.unitPrice, item.quantity, item.totalPrice, null, item.item_order ?? i, item.itemNumber || null]
+          `INSERT INTO items (receipt_id, name, unit_price, quantity, discount, total_price, category, item_order, item_number)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+          [receipt.id, item.name, item.unitPrice, item.quantity, item.discount || 0, item.totalPrice, null, item.item_order ?? i, item.itemNumber || null]
         );
         savedItems.push(result.rows[0]);
       }
