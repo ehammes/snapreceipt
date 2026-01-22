@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS items (
     name VARCHAR(500) NOT NULL,
     unit_price DECIMAL(10,2) NOT NULL,
     quantity INTEGER NOT NULL,
+    discount DECIMAL(10,2) DEFAULT 0,
     total_price DECIMAL(10,2) NOT NULL,
     category VARCHAR(100),
     item_order INTEGER DEFAULT 0,
@@ -39,6 +40,9 @@ CREATE TABLE IF NOT EXISTS items (
 
 -- Add item_number column if table already exists without it
 ALTER TABLE items ADD COLUMN IF NOT EXISTS item_number VARCHAR(50);
+
+-- Add discount column if table already exists without it
+ALTER TABLE items ADD COLUMN IF NOT EXISTS discount DECIMAL(10,2) DEFAULT 0;
 
 -- Create indexes for better query performance
 CREATE INDEX IF NOT EXISTS idx_receipts_user_id ON receipts(user_id);
