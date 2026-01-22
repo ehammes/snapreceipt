@@ -58,8 +58,7 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
     return Math.round(calculatedTax * 100) / 100; // Round to 2 decimal places
   });
 
-  // Separate state for subtotal and tax to allow manual override
-  const [subtotalOverride, setSubtotalOverride] = useState<string | null>(null);
+  // Separate state for tax to allow manual override
   const [taxOverride, setTaxOverride] = useState<string | null>(null);
 
   // Generate unique ID for new items
@@ -157,11 +156,8 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
     return formData.items.reduce((sum, item) => sum + (Number(item.totalPrice) || 0), 0);
   };
 
-  // Get effective subtotal (override or calculated)
+  // Get effective subtotal (always calculated from items)
   const getSubtotal = () => {
-    if (subtotalOverride !== null) {
-      return parseFloat(subtotalOverride) || 0;
-    }
     return calculateItemsTotal();
   };
 
