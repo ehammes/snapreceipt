@@ -204,7 +204,7 @@ const ReceiptDetail: React.FC = () => {
     setSaving(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE_URL}/api/receipts/${id}/items`, {
+      const response = await fetch(`${API_BASE_URL}/api/items?receiptId=${id}`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

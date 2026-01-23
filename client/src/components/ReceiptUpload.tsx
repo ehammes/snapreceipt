@@ -466,13 +466,14 @@ const ReceiptUpload: React.FC = () => {
         for (const item of data.items) {
           if (item.id && !item.id.startsWith('new-') && !item.id.startsWith('item-')) {
             // Update existing items
-            await fetch(`${API_BASE_URL}/api/receipts/${receiptId}/items/${item.id}`, {
+            await fetch(`${API_BASE_URL}/api/items/${item.id}?receiptId=${receiptId}`, {
               method: 'PUT',
               headers: {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json',
               },
               body: JSON.stringify({
+                itemNumber: item.itemNumber,
                 name: item.name,
                 unitPrice: item.unitPrice,
                 quantity: item.quantity,
@@ -482,13 +483,14 @@ const ReceiptUpload: React.FC = () => {
             });
           } else if (item.id && (item.id.startsWith('new-') || item.id.startsWith('item-'))) {
             // Create new items added in the review modal
-            await fetch(`${API_BASE_URL}/api/receipts/${receiptId}/items`, {
+            await fetch(`${API_BASE_URL}/api/items?receiptId=${receiptId}`, {
               method: 'POST',
               headers: {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json',
               },
               body: JSON.stringify({
+                itemNumber: item.itemNumber,
                 name: item.name,
                 unitPrice: item.unitPrice,
                 quantity: item.quantity,
