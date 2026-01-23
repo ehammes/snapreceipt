@@ -6,11 +6,18 @@ dotenv.config();
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false },
+  // Neon-specific optimizations
+  max: 20, // Maximum pool size
+  idleTimeoutMillis: 30000, // Close idle clients after 30 seconds
+  connectionTimeoutMillis: 10000, // Timeout connection after 10 seconds
+  allowExitOnIdle: true, // Allow pool to exit if all clients are idle
 });
 
+// Handle pool errors gracefully without crashing
 pool.on('error', (err: Error) => {
-  console.error('Unexpected error on idle client', err);
-  process.exit(-1);
+  console.error('Unexpected database error on idle client:', err);
+  console.error('Connection will be removed from pool and replaced');
+  // Don't crash the server - let the pool handle it
 });
 
 // Helper function to test connection
