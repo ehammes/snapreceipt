@@ -351,5 +351,72 @@ SUBTOTAL
       expect(result.items.length).toBe(1);
       expect(result.items[0].name).toContain('REAL ITEM');
     });
+
+    it('should match items to prices sequentially when in consecutive blocks', () => {
+      // Tests the fix for PEDIASURE OG price issue (GitHub issue #XX)
+      // When items and prices form consecutive blocks (Costco-style),
+      // use sequential matching instead of greedy distance matching
+      const rawText = `COSTCO
+WHOLESALE
+E 1268174 PEDIASURE OG
+E 923855 POST-TS
+39.99 E
+16.99 E
+SUBTOTAL
+56.98
+**** TOTAL
+56.98`;
+
+      const result = ocrService.parseReceiptText(rawText);
+
+      expect(result.items.length).toBe(2);
+
+      // PEDIASURE OG should get first price (39.99), NOT second price
+      const pediasure = result.items.find(item => item.name.includes('PEDIASURE'));
+      expect(pediasure).toBeDefined();
+      expect(pediasure!.unitPrice).toBe(39.99);
+      expect(pediasure!.itemNumber).toBe('1268174');
+      expect(pediasure!.totalPrice).toBe(39.99);
+
+      // POST-TS should get second price (16.99), NOT first price
+      const postTs = result.items.find(item => item.name.includes('POST'));
+      expect(postTs).toBeDefined();
+      expect(postTs!.unitPrice).toBe(16.99);
+      expect(postTs!.itemNumber).toBe('923855');
+      expect(postTs!.totalPrice).toBe(16.99);
+    });
+
+    it('should handle mixed item-price layouts with greedy matching', () => {
+      // When items and prices are interleaved (not consecutive blocks),
+      // use greedy distance matching instead of sequential
+      const rawText = `COSTCO
+WHOLESALE
+1234567 ITEM A
+19.99 A
+E 7654321 ITEM B
+E 9876543 ITEM C
+29.99 E
+39.99 E
+SUBTOTAL
+89.97
+**** TOTAL
+89.97`;
+
+      const result = ocrService.parseReceiptText(rawText);
+
+      expect(result.items.length).toBe(3);
+
+      const itemA = result.items.find(item => item.name.includes('ITEM A'));
+      expect(itemA).toBeDefined();
+      expect(itemA!.unitPrice).toBe(19.99);
+
+      const itemB = result.items.find(item => item.name.includes('ITEM B'));
+      expect(itemB).toBeDefined();
+      expect(itemB!.unitPrice).toBe(29.99);
+
+      const itemC = result.items.find(item => item.name.includes('ITEM C'));
+      expect(itemC).toBeDefined();
+      expect(itemC!.unitPrice).toBe(39.99);
+    });
   });
 });
