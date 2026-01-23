@@ -1,3 +1,6 @@
+// Default category for new items
+export const DEFAULT_CATEGORY = 'Uncategorized';
+
 export const CATEGORIES = [
   'Alcohol',
   'Clothing',
@@ -6,7 +9,7 @@ export const CATEGORIES = [
   'Health & Beauty',
   'Household Supplies',
   'Other',
-  'Uncategorized'
+  DEFAULT_CATEGORY
 ] as const;
 
 export type Category = (typeof CATEGORIES)[number];
