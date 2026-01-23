@@ -35,6 +35,7 @@ interface StoreForm {
   storeCity: string;
   storeState: string;
   storeZip: string;
+  purchaseDate: string;
 }
 
 interface ItemForm {
@@ -66,6 +67,7 @@ const ReceiptDetail: React.FC = () => {
     storeCity: '',
     storeState: '',
     storeZip: '',
+    purchaseDate: '',
   });
 
   const [itemForm, setItemForm] = useState<ItemForm>({
@@ -154,6 +156,7 @@ const ReceiptDetail: React.FC = () => {
         storeCity: receiptData.store_city || '',
         storeState: receiptData.store_state || '',
         storeZip: receiptData.store_zip || '',
+        purchaseDate: receiptData.purchase_date || '',
       });
     } catch (err) {
       console.error('Error fetching receipt:', err);
@@ -287,6 +290,11 @@ const ReceiptDetail: React.FC = () => {
       month: 'long',
       day: 'numeric',
     });
+  };
+
+  const formatDateForInput = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toISOString().split('T')[0];
   };
 
   const formatCurrency = (amount: number) => {
@@ -813,6 +821,15 @@ const ReceiptDetail: React.FC = () => {
                       maxLength={10}
                     />
                   </div>
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1">Purchase Date</label>
+                    <input
+                      type="date"
+                      value={formatDateForInput(storeForm.purchaseDate)}
+                      onChange={(e) => setStoreForm({ ...storeForm, purchaseDate: e.target.value })}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
                   <div className="flex gap-3">
                     <button
                       onClick={handleSaveStoreInfo}
@@ -830,6 +847,7 @@ const ReceiptDetail: React.FC = () => {
                           storeCity: receipt.store_city || '',
                           storeState: receipt.store_state || '',
                           storeZip: receipt.store_zip || '',
+                          purchaseDate: receipt.purchase_date || '',
                         });
                       }}
                       className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg font-medium transition-colors"
