@@ -314,7 +314,7 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
                           type="number"
                           step="0.01"
                           min="0"
-                          value={taxOverride !== null ? taxOverride : getTax()}
+                          value={taxOverride !== null ? parseFloat(taxOverride).toFixed(2) : getTax().toFixed(2)}
                           onChange={(e) => handleTaxChange(e.target.value)}
                           onBlur={(e) => {
                             const value = parseFloat(e.target.value) || 0;
@@ -421,7 +421,7 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
                                 type="number"
                                 step="0.01"
                                 min="0"
-                                value={item.discount || 0}
+                                value={typeof item.discount === 'number' ? item.discount.toFixed(2) : '0.00'}
                                 onChange={(e) => updateItem(item.id, 'discount', parseFloat(e.target.value) || 0)}
                                 onBlur={(e) => {
                                   const value = parseFloat(e.target.value) || 0;
@@ -526,7 +526,7 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
                             type="number"
                             step="0.01"
                             min="0"
-                            value={newItem.discount || ''}
+                            value={typeof newItem.discount === 'number' ? newItem.discount.toFixed(2) : '0.00'}
                             onChange={(e) => setNewItem(prev => ({ ...prev, discount: parseFloat(e.target.value) || 0 }))}
                             onBlur={(e) => {
                               const value = parseFloat(e.target.value) || 0;
