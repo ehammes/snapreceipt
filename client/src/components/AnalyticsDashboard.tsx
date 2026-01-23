@@ -116,7 +116,7 @@ const AnalyticsDashboard: React.FC = () => {
 
   // Expanded row state
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
-  const [priceHistory, setPriceHistory] = useState<Record<string, Array<{ date: string; price: number }>>>({});
+  const [priceHistory, setPriceHistory] = useState<Record<string, Array<{ date: string; unitPrice: number; quantity: number; totalCost: number }>>>({});
   const [loadingHistory, setLoadingHistory] = useState<string | null>(null);
 
   // Sorted items
@@ -171,7 +171,7 @@ const AnalyticsDashboard: React.FC = () => {
       const receipts: Receipt[] = data.receipts || [];
 
       // Extract price history for this item from all receipts
-      const history: Array<{ date: string; price: number }> = [];
+      const history: Array<{ date: string; unitPrice: number; quantity: number; totalCost: number }> = [];
 
       receipts.forEach((receipt) => {
         (receipt.items || []).forEach((item) => {
@@ -180,9 +180,15 @@ const AnalyticsDashboard: React.FC = () => {
           const numberMatch = itemNumber && item.id && item.id === itemNumber;
 
           if (nameMatch || numberMatch) {
+            const unitPrice = Number(item.unit_price) || Number(item.total_price) / (item.quantity || 1);
+            const quantity = Number(item.quantity) || 1;
+            const totalCost = Number(item.total_price) || unitPrice * quantity;
+
             history.push({
               date: receipt.purchase_date,
-              price: Number(item.unit_price) || Number(item.total_price) / (item.quantity || 1),
+              unitPrice,
+              quantity,
+              totalCost,
             });
           }
         });
@@ -787,19 +793,22 @@ const AnalyticsDashboard: React.FC = () => {
                             <div className="space-y-2">
                               {priceHistory[rowKey].map((entry, idx, arr) => {
                                 // Compare to next entry (older purchase) since sorted most recent first
-                                const olderPrice = idx < arr.length - 1 ? arr[idx + 1].price : null;
-                                const change = olderPrice ? ((entry.price - olderPrice) / olderPrice) * 100 : null;
+                                const olderUnitPrice = idx < arr.length - 1 ? arr[idx + 1].unitPrice : null;
+                                const change = olderUnitPrice ? ((entry.unitPrice - olderUnitPrice) / olderUnitPrice) * 100 : null;
 
                                 return (
-                                  <div key={idx} className="flex items-center justify-between px-3 py-2 rounded-lg bg-gray-50">
-                                    <span className="text-xs text-gray-600">{formatDate(entry.date)}</span>
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-sm font-medium text-gray-900">${entry.price.toFixed(2)}</span>
+                                  <div key={idx} className="px-3 py-2 rounded-lg bg-gray-50">
+                                    <div className="flex items-center justify-between mb-1">
+                                      <span className="text-xs text-gray-600">{formatDate(entry.date)}</span>
                                       {change !== null && (
                                         <span className={`text-xs font-medium ${change > 0 ? 'text-red-600' : change < 0 ? 'text-green-600' : 'text-gray-400'}`}>
                                           {change > 0 ? '+' : ''}{change.toFixed(1)}%
                                         </span>
                                       )}
+                                    </div>
+                                    <div className="flex items-center justify-between text-xs">
+                                      <span className="text-gray-500">Unit: ${entry.unitPrice.toFixed(2)} × {entry.quantity}</span>
+                                      <span className="font-medium text-gray-900">= ${entry.totalCost.toFixed(2)}</span>
                                     </div>
                                   </div>
                                 );
@@ -1008,15 +1017,17 @@ const AnalyticsDashboard: React.FC = () => {
                                       <thead>
                                         <tr className="border-b border-gray-200">
                                           <th className="px-3 py-2 text-xs font-medium text-left text-gray-500 uppercase">Date</th>
-                                          <th className="px-3 py-2 text-xs font-medium text-right text-gray-500 uppercase">Price</th>
+                                          <th className="px-3 py-2 text-xs font-medium text-right text-gray-500 uppercase">Unit Price</th>
+                                          <th className="px-3 py-2 text-xs font-medium text-right text-gray-500 uppercase">Qty</th>
+                                          <th className="px-3 py-2 text-xs font-medium text-right text-gray-500 uppercase">Total Cost</th>
                                           <th className="px-3 py-2 text-xs font-medium text-right text-gray-500 uppercase">Change</th>
                                         </tr>
                                       </thead>
                                       <tbody>
                                         {priceHistory[rowKey].map((entry, idx, arr) => {
-                                          // Compare to next entry (older purchase) since sorted most recent first
-                                          const olderPrice = idx < arr.length - 1 ? arr[idx + 1].price : null;
-                                          const change = olderPrice ? ((entry.price - olderPrice) / olderPrice) * 100 : null;
+                                          // Compare to next entry (older purchase) based on unit price
+                                          const olderUnitPrice = idx < arr.length - 1 ? arr[idx + 1].unitPrice : null;
+                                          const change = olderUnitPrice ? ((entry.unitPrice - olderUnitPrice) / olderUnitPrice) * 100 : null;
 
                                           return (
                                             <tr key={idx} className="border-b border-gray-100 last:border-0">
@@ -1024,7 +1035,13 @@ const AnalyticsDashboard: React.FC = () => {
                                                 {formatDate(entry.date)}
                                               </td>
                                               <td className="px-3 py-2 font-medium text-right text-gray-900">
-                                                ${entry.price.toFixed(2)}
+                                                ${entry.unitPrice.toFixed(2)}
+                                              </td>
+                                              <td className="px-3 py-2 text-right text-gray-600">
+                                                {entry.quantity}
+                                              </td>
+                                              <td className="px-3 py-2 font-medium text-right text-gray-900">
+                                                ${entry.totalCost.toFixed(2)}
                                               </td>
                                               <td className="px-3 py-2 text-right">
                                                 {change !== null ? (
