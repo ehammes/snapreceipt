@@ -88,6 +88,7 @@ router.post('/upload', optionalAuth, async (req: Request, res: Response): Promis
       image_url: imageUrl,
       purchase_date: ocrData.purchaseDate,
       total_amount: ocrData.totalAmount,
+      tax_amount: ocrData.taxAmount,
       store_name: ocrData.storeName,
       store_location: ocrData.storeLocation,
       store_city: ocrData.storeCity,

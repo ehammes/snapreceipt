@@ -114,6 +114,7 @@ export interface ParsedReceiptData {
   storeZip: string;
   purchaseDate: Date;
   totalAmount: number;
+  taxAmount?: number; // Extracted tax from receipt
   items: ParsedItem[];
   rawText?: string; // For debugging
 }
@@ -230,6 +231,9 @@ class OCRService {
 
     // Extract total amount
     this.extractTotal(text, result);
+
+    // Extract tax amount
+    this.extractTax(text, result);
 
     return result;
   }
@@ -377,7 +381,7 @@ class OCRService {
     // Pattern for item line: optionally starts with tax code (E, A, etc.), then item number (4-7 digits), followed by name
     // Examples: "1954841 IRIS BIN" or "E 1603075 ORG PFCT BAR" or "$843323 STRING CHEES" ($ is OCR error for 8)
     // Note: $ can be OCR error for 8 or S, so we allow it at the start of item numbers
-    const itemLineRegex = /^(?:[A-Z]\s+)?([$]?\d{4,7}[A-Z]?)\s+(.+)$/i;
+    const itemLineRegex = /^(?:([A-Z])\s+)?([$]?\d{4,7}[A-Z]?)\s+(.+)$/i;
 
     // Pattern for price line: price followed by optional tax code (A, E, F, etc.)
     const priceLineRegex = /^(\d+\.\d{2})\s*([A-Z])?\s*$/;
@@ -394,12 +398,12 @@ class OCRService {
 
     // Pattern for item with price on same line (with optional tax code prefix)
     // Note: $ can be OCR error for 8 or S
-    const itemWithPriceRegex = /^(?:[A-Z]\s+)?([$]?\d{4,7}[A-Z]?)\s+(.+?)\s+(\d+\.\d{2})\s*([A-Z])?\s*$/i;
+    const itemWithPriceRegex = /^(?:([A-Z])\s+)?([$]?\d{4,7}[A-Z]?)\s+(.+?)\s+(\d+\.\d{2})\s*([A-Z])?\s*$/i;
 
     // Track pending items waiting for prices (queue to handle multiple consecutive items)
-    const pendingItems: Array<{ itemNumber: string; name: string; order: number }> = [];
+    const pendingItems: Array<{ itemNumber: string; name: string; order: number; taxCode?: string }> = [];
     // Buffer for collecting consecutive prices when multiple items are pending
-    const pendingPrices: Array<{ price: number; order: number }> = [];
+    const pendingPrices: Array<{ price: number; order: number; taxCode?: string }> = [];
     // Buffer for pending discounts (apply to first pending price when matching)
     const pendingDiscounts: Array<{ discount: number; order: number }> = [];
     let orphanPrice: { price: number; order: number } | null = null;
@@ -438,8 +442,8 @@ class OCRService {
 
       // DEBUG: Log matching info
       this.debug(`[OCR DEBUG] Matching ${pendingItems.length} items with ${pendingPrices.length} prices`);
-      this.debug('[OCR DEBUG] Items:', pendingItems.map(i => `${i.itemNumber} ${i.name} (line ${i.order})`));
-      this.debug('[OCR DEBUG] Prices:', pendingPrices.map(p => `$${p.price} (line ${p.order})`));
+      this.debug('[OCR DEBUG] Items:', pendingItems.map(i => `${i.taxCode || '?'} ${i.itemNumber} ${i.name} (line ${i.order})`));
+      this.debug('[OCR DEBUG] Prices:', pendingPrices.map(p => `$${p.price} ${p.taxCode || '?'} (line ${p.order})`));
 
       // When we have equal counts, find optimal matching by trying different orderings
       // This handles cases where OCR reads items and prices in different orders
@@ -457,11 +461,116 @@ class OCRService {
         let bestMatching: Array<{ itemIdx: number; priceIdx: number }> = [];
 
         if (isConsecutiveBlock) {
-          // Sequential matching: match items to prices in order
+          // Sequential matching with tax code grouping: match items to prices by tax code first, then in order
           // This handles Costco-style receipts where N items are followed by N prices
           this.debug('[OCR DEBUG] Using sequential matching (consecutive block detected)');
-          for (let i = 0; i < pendingItems.length; i++) {
-            bestMatching.push({ itemIdx: i, priceIdx: i });
+
+          // Check if we have tax codes available for grouping
+          const hasItemTaxCodes = pendingItems.some(item => item.taxCode);
+          const hasPriceTaxCodes = pendingPrices.some(price => price.taxCode);
+
+          if (hasItemTaxCodes && hasPriceTaxCodes) {
+            // Group items and prices by tax code
+            this.debug('[OCR DEBUG] Tax codes detected - grouping by tax code before sequential matching');
+
+            // Create maps of tax code -> items/prices
+            const itemsByTaxCode = new Map<string, number[]>();
+            const pricesByTaxCode = new Map<string, number[]>();
+
+            // Group items by tax code
+            pendingItems.forEach((item, idx) => {
+              const code = item.taxCode || 'UNKNOWN';
+              if (!itemsByTaxCode.has(code)) {
+                itemsByTaxCode.set(code, []);
+              }
+              itemsByTaxCode.get(code)!.push(idx);
+            });
+
+            // Group prices by tax code
+            pendingPrices.forEach((price, idx) => {
+              const code = price.taxCode || 'UNKNOWN';
+              if (!pricesByTaxCode.has(code)) {
+                pricesByTaxCode.set(code, []);
+              }
+              pricesByTaxCode.get(code)!.push(idx);
+            });
+
+            this.debug('[OCR DEBUG] Items by tax code:', Array.from(itemsByTaxCode.entries()).map(([code, indices]) =>
+              `${code}: ${indices.map(i => pendingItems[i].name).join(', ')}`
+            ));
+            this.debug('[OCR DEBUG] Prices by tax code:', Array.from(pricesByTaxCode.entries()).map(([code, indices]) =>
+              `${code}: ${indices.map(i => `$${pendingPrices[i].price}`).join(', ')}`
+            ));
+
+            // Match within each tax code group sequentially
+            const usedPriceIndices = new Set<number>();
+            const usedItemIndices = new Set<number>();
+
+            // First pass: Match items with known tax codes to prices with matching tax codes
+            for (const [taxCode, itemIndices] of itemsByTaxCode) {
+              if (taxCode === 'UNKNOWN') continue; // Skip UNKNOWN items in first pass
+
+              const priceIndices = pricesByTaxCode.get(taxCode) || [];
+              const matchCount = Math.min(itemIndices.length, priceIndices.length);
+
+              for (let i = 0; i < matchCount; i++) {
+                bestMatching.push({ itemIdx: itemIndices[i], priceIdx: priceIndices[i] });
+                usedItemIndices.add(itemIndices[i]);
+                usedPriceIndices.add(priceIndices[i]);
+                this.debug(`[OCR DEBUG] Tax code ${taxCode} group: matching ${pendingItems[itemIndices[i]].name} -> $${pendingPrices[priceIndices[i]].price}`);
+              }
+            }
+
+            // Second pass: Match UNKNOWN items to remaining unmatched prices sequentially
+            const unknownItems = itemsByTaxCode.get('UNKNOWN') || [];
+            const unmatchedPrices: number[] = [];
+            for (let i = 0; i < pendingPrices.length; i++) {
+              if (!usedPriceIndices.has(i)) {
+                unmatchedPrices.push(i);
+              }
+            }
+
+            const matchCount = Math.min(unknownItems.length, unmatchedPrices.length);
+            for (let i = 0; i < matchCount; i++) {
+              const itemIdx = unknownItems[i];
+              const priceIdx = unmatchedPrices[i];
+              if (!usedItemIndices.has(itemIdx)) {
+                bestMatching.push({ itemIdx, priceIdx });
+                usedItemIndices.add(itemIdx);
+                usedPriceIndices.add(priceIdx);
+                this.debug(`[OCR DEBUG] UNKNOWN item matched to remaining price: ${pendingItems[itemIdx].name} -> $${pendingPrices[priceIdx].price}`);
+              }
+            }
+
+            // Third pass: Match any remaining unmatched items to remaining unmatched prices
+            // This handles mismatched tax codes (e.g., item has "I", price has "E")
+            const remainingItems: number[] = [];
+            const remainingPrices: number[] = [];
+
+            for (let i = 0; i < pendingItems.length; i++) {
+              if (!usedItemIndices.has(i)) {
+                remainingItems.push(i);
+              }
+            }
+            for (let i = 0; i < pendingPrices.length; i++) {
+              if (!usedPriceIndices.has(i)) {
+                remainingPrices.push(i);
+              }
+            }
+
+            const remainingMatchCount = Math.min(remainingItems.length, remainingPrices.length);
+            for (let i = 0; i < remainingMatchCount; i++) {
+              const itemIdx = remainingItems[i];
+              const priceIdx = remainingPrices[i];
+              bestMatching.push({ itemIdx, priceIdx });
+              this.debug(`[OCR DEBUG] Remaining item matched (mismatched tax codes): ${pendingItems[itemIdx].name} (${pendingItems[itemIdx].taxCode || '?'}) -> $${pendingPrices[priceIdx].price} (${pendingPrices[priceIdx].taxCode || '?'})`);
+            }
+          } else {
+            // No tax codes - fall back to simple sequential matching
+            this.debug('[OCR DEBUG] No tax codes detected - using simple sequential matching');
+            for (let i = 0; i < pendingItems.length; i++) {
+              bestMatching.push({ itemIdx: i, priceIdx: i });
+            }
           }
         } else {
           // Use greedy matching for non-consecutive layouts
@@ -659,6 +768,7 @@ class OCRService {
       const priceMatch = line.match(priceLineRegex);
       if (priceMatch) {
         const price = parseFloat(priceMatch[1]);
+        const taxCode = priceMatch[2]; // Extract tax code (A, E, F, etc.)
         if (price >= 0.01 && price < 10000) {
           // Don't treat regular prices as discount amounts even if we saw a barcode line
           // The barcode lines are just metadata - actual discounts come from lines ending with '-'
@@ -669,8 +779,8 @@ class OCRService {
           }
 
           if (pendingItems.length > 0) {
-            // Add to pending prices buffer
-            pendingPrices.push({ price, order: i });
+            // Add to pending prices buffer with tax code
+            pendingPrices.push({ price, order: i, taxCode });
 
             // If we have only 1 pending item, match immediately (no multi-column ambiguity)
             if (pendingItems.length === 1 && pendingPrices.length === 1) {
@@ -733,6 +843,7 @@ class OCRService {
       // Check for item with price on same line
       const itemWithPriceMatch = line.match(itemWithPriceRegex);
       if (itemWithPriceMatch) {
+        this.debug(`[OCR DEBUG] Found item with price on same line: ${line}`);
         // First, resolve any pending items using orphanPrice if available
         if (pendingItems.length > 0 && orphanPrice) {
           const item = pendingItems.shift()!;
@@ -758,9 +869,12 @@ class OCRService {
           orphanPrice = null;
         }
 
-        const itemNumber = itemWithPriceMatch[1];
-        const name = this.cleanItemName(itemWithPriceMatch[2]);
-        const price = parseFloat(itemWithPriceMatch[3]);
+        // const taxCode = itemWithPriceMatch[1]; // Tax code prefix (E, A, etc.) - not currently used
+        const itemNumber = itemWithPriceMatch[2];
+        const name = this.cleanItemName(itemWithPriceMatch[3]);
+        const price = parseFloat(itemWithPriceMatch[4]);
+
+        this.debug(`[OCR DEBUG] Extracted: itemNumber=${itemNumber}, name="${name}", price=${price}, nameLength=${name.length}`);
 
         if (name.length >= 2 && price >= 0.01 && price < 10000) {
           // Check for discount by item number
@@ -780,6 +894,9 @@ class OCRService {
             totalPrice: Math.round((price - discount) * 100) / 100,
             order: i,  // Use current line number as order
           });
+          this.debug(`[OCR DEBUG] Added item with price on same line: ${name} -> $${price} (discount: $${discount})`);
+        } else {
+          this.debug(`[OCR DEBUG] SKIPPED item with price - failed validation: name.length=${name.length}, price=${price}`);
         }
         continue;
       }
@@ -793,12 +910,13 @@ class OCRService {
           matchPendingItemsAndPrices();
         }
 
-        const itemNumber = itemMatch[1];
-        const name = this.cleanItemName(itemMatch[2]);
+        const taxCode = itemMatch[1]; // Extract tax code (E, A, etc.)
+        const itemNumber = itemMatch[2];
+        const name = this.cleanItemName(itemMatch[3]);
 
         if (name.length >= 2) {
-          // Add to pending items queue
-          pendingItems.push({ itemNumber, name, order: i });
+          // Add to pending items queue with tax code
+          pendingItems.push({ itemNumber, name, order: i, taxCode });
         }
         continue;
       }
@@ -846,8 +964,16 @@ class OCRService {
       }
     }
 
+    // DEBUG: Log raw items before merge
+    this.debug(`[OCR DEBUG] Total raw items before merge: ${rawItems.length}`);
+    this.debug('[OCR DEBUG] Raw items:', rawItems.map(item => `${item.name} -> $${item.totalPrice}`).join(', '));
+
     // Merge duplicate items (same name + same price)
     const mergedItems = mergeDuplicateItems(rawItems);
+
+    // DEBUG: Log merged items
+    this.debug(`[OCR DEBUG] Total items after merge: ${mergedItems.length}`);
+    this.debug('[OCR DEBUG] Final items:', mergedItems.map(item => `${item.name} (qty: ${item.quantity}) -> $${item.totalPrice}`).join(', '));
 
     // Assign merged items to result
     result.items = mergedItems;
@@ -920,6 +1046,54 @@ class OCRService {
     if (result.items.length > 0) {
       result.totalAmount = result.items.reduce((sum, item) => sum + item.totalPrice, 0);
       result.totalAmount = Math.round(result.totalAmount * 100) / 100;
+    }
+  }
+
+  /**
+   * Extract tax amount from receipt text
+   */
+  private extractTax(text: string, result: ParsedReceiptData): void {
+    const lines = text.split('\n').map(l => l.trim());
+
+    // Look for tax amount on receipts
+    // Common patterns: "TAX 14.64", "TOTAL TAX 14.64", or standalone "14.64" after TAX label
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+
+      // Pattern 1: TAX followed by amount on same line
+      const taxWithAmountMatch = line.match(/^(?:TOTAL\s+)?TAX\s+(\d+\.\d{2})/i);
+      if (taxWithAmountMatch) {
+        result.taxAmount = parseFloat(taxWithAmountMatch[1]);
+        return;
+      }
+
+      // Pattern 2: TAX label on one line, amount on next line
+      if (/^TAX$/i.test(line) && i + 1 < lines.length) {
+        const nextLine = lines[i + 1].trim();
+        const amountMatch = nextLine.match(/^(\d+\.\d{2})$/);
+        if (amountMatch) {
+          result.taxAmount = parseFloat(amountMatch[1]);
+          return;
+        }
+      }
+
+      // Pattern 3: Look in the TOTAL section for tax (between SUBTOTAL and TOTAL)
+      if (/^SUBTOTAL$/i.test(line) || /^\*+\s*TOTAL/i.test(line)) {
+        // Scan next few lines for standalone amounts
+        const amounts: number[] = [];
+        for (let j = i + 1; j < Math.min(i + 10, lines.length); j++) {
+          if (/^\*+\s*TOTAL/i.test(lines[j])) break;
+          const amountMatch = lines[j].match(/^(\d+\.\d{2})$/);
+          if (amountMatch) {
+            amounts.push(parseFloat(amountMatch[1]));
+          }
+        }
+        // If we found amounts, the smallest is likely tax (tax < subtotal < total)
+        if (amounts.length >= 2) {
+          result.taxAmount = Math.min(...amounts);
+          return;
+        }
+      }
     }
   }
 

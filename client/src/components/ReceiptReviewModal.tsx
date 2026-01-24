@@ -21,6 +21,7 @@ export interface ReviewData {
   storeZip: string;
   purchaseDate: string;
   totalAmount: number;
+  taxAmount?: number; // Extracted tax from OCR
   items: ReviewItem[];
   imageUrl: string;
 }
@@ -53,6 +54,10 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
 
   // Lock in initial tax amount on first render (stays constant unless manually edited)
   const [initialTax] = useState<number>(() => {
+    // Use extracted tax if available, otherwise calculate from total - items
+    if (data.taxAmount !== undefined && data.taxAmount >= 0) {
+      return Math.round(data.taxAmount * 100) / 100;
+    }
     const itemsTotal = data.items.reduce((sum, item) => sum + (Number(item.totalPrice) || 0), 0);
     const calculatedTax = Math.max(0, data.totalAmount - itemsTotal);
     return Math.round(calculatedTax * 100) / 100; // Round to 2 decimal places
@@ -62,7 +67,7 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
   const [taxOverride, setTaxOverride] = useState<string | null>(null);
 
   // Generate unique ID for new items
-  const generateId = () => `new-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  const generateId = () => `new-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
 
   // Format date for input
   const formatDateForInput = (dateString: string) => {
@@ -153,7 +158,13 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
 
   // Calculate subtotal from items
   const calculateItemsTotal = () => {
-    return formData.items.reduce((sum, item) => sum + (Number(item.totalPrice) || 0), 0);
+    const total = formData.items.reduce((sum, item) => {
+      const price = Number(item.totalPrice) || 0;
+      console.log(`[SUBTOTAL DEBUG] ${item.name}: $${price} (sum so far: $${sum + price})`);
+      return sum + price;
+    }, 0);
+    console.log(`[SUBTOTAL DEBUG] Final total: $${total}, Item count: ${formData.items.length}`);
+    return total;
   };
 
   // Get effective subtotal (always calculated from items)
@@ -175,7 +186,7 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
     setTaxOverride(value);
     const subtotal = getSubtotal();
     const tax = parseFloat(value) || 0;
-    setFormData(prev => ({ ...prev, totalAmount: subtotal + tax }));
+    setFormData(prev => ({ ...prev, totalAmount: Math.round((subtotal + tax) * 100) / 100 }));
   };
 
   // Format currency
@@ -314,7 +325,7 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
                           type="number"
                           step="0.01"
                           min="0"
-                          value={taxOverride !== null ? parseFloat(taxOverride).toFixed(2) : getTax().toFixed(2)}
+                          value={taxOverride !== null ? taxOverride : getTax().toFixed(2)}
                           onChange={(e) => handleTaxChange(e.target.value)}
                           onBlur={(e) => {
                             const value = parseFloat(e.target.value) || 0;

@@ -7,6 +7,7 @@ export interface Receipt {
   upload_date: Date;
   purchase_date: Date | null;
   total_amount: number;
+  tax_amount?: number | null;
   store_name: string | null;
   store_location: string | null;
   store_city: string | null;
@@ -19,6 +20,7 @@ export interface CreateReceiptData {
   image_url: string;
   purchase_date?: Date | null;
   total_amount?: number;
+  tax_amount?: number | null;
   store_name?: string | null;
   store_location?: string | null;
   store_city?: string | null;
@@ -29,6 +31,7 @@ export interface CreateReceiptData {
 export interface UpdateReceiptData {
   purchase_date?: Date | null;
   total_amount?: number;
+  tax_amount?: number | null;
   store_name?: string | null;
   store_location?: string | null;
   store_city?: string | null;
@@ -39,14 +42,15 @@ export interface UpdateReceiptData {
 export const ReceiptModel = {
   async create(data: CreateReceiptData): Promise<Receipt> {
     const result = await pool.query(
-      `INSERT INTO receipts (user_id, image_url, purchase_date, total_amount, store_name, store_location, store_city, store_state, store_zip)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      `INSERT INTO receipts (user_id, image_url, purchase_date, total_amount, tax_amount, store_name, store_location, store_city, store_state, store_zip)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        RETURNING *`,
       [
         data.user_id,
         data.image_url,
         data.purchase_date || null,
         data.total_amount || 0,
+        data.tax_amount || null,
         data.store_name || null,
         data.store_location || null,
         data.store_city || null,
@@ -87,6 +91,10 @@ export const ReceiptModel = {
     if (data.total_amount !== undefined) {
       fields.push(`total_amount = $${paramCount++}`);
       values.push(data.total_amount);
+    }
+    if (data.tax_amount !== undefined) {
+      fields.push(`tax_amount = $${paramCount++}`);
+      values.push(data.tax_amount);
     }
     if (data.store_name !== undefined) {
       fields.push(`store_name = $${paramCount++}`);

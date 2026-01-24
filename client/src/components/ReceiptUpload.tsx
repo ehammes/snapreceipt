@@ -23,6 +23,7 @@ interface ProcessedReceipt {
   storeZip: string;
   purchaseDate: string;
   totalAmount: number;
+  taxAmount?: number;
   items: ProcessedItem[];
   imageUrl: string;
 }
@@ -112,6 +113,7 @@ const ReceiptUpload: React.FC = () => {
       storeZip: data.storeZip || '',
       purchaseDate: data.purchaseDate || new Date().toISOString(),
       totalAmount: data.totalAmount || 0,
+      taxAmount: data.taxAmount,
       imageUrl: data.imageUrl || '',
       items: data.items.map((item, index) => ({
         id: item.id || `item-${index}-${Date.now()}`,
@@ -358,6 +360,7 @@ const ReceiptUpload: React.FC = () => {
         storeZip: data.data?.store_zip || data.data?.storeZip || '',
         purchaseDate: data.data?.purchase_date || data.data?.purchaseDate || new Date().toISOString(),
         totalAmount: totalAmount,
+        taxAmount: data.data?.tax_amount !== undefined ? parseFloat(data.data.tax_amount) : data.data?.taxAmount,
         imageUrl: data.data?.image_url || data.imageUrl || '',
         items: items.map((item: any) => ({
           id: item.id?.toString(),

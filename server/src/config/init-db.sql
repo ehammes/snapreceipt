@@ -44,6 +44,9 @@ ALTER TABLE items ADD COLUMN IF NOT EXISTS item_number VARCHAR(50);
 -- Add discount column if table already exists without it
 ALTER TABLE items ADD COLUMN IF NOT EXISTS discount DECIMAL(10,2) DEFAULT 0;
 
+-- Add tax_amount column if table already exists without it
+ALTER TABLE receipts ADD COLUMN IF NOT EXISTS tax_amount DECIMAL(10,2);
+
 -- Create indexes for better query performance
 CREATE INDEX IF NOT EXISTS idx_receipts_user_id ON receipts(user_id);
 CREATE INDEX IF NOT EXISTS idx_receipts_purchase_date ON receipts(purchase_date);
