@@ -52,6 +52,10 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
     category: 'Uncategorized',
   });
 
+  // Drag and drop state
+  const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
+  const [dragOverItemId, setDragOverItemId] = useState<string | null>(null);
+
   // Lock in initial tax amount on first render (stays constant unless manually edited)
   const [initialTax] = useState<number>(() => {
     // Use extracted tax if available, otherwise calculate from total - items
@@ -121,6 +125,54 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
         totalAmount: newTotal,
       };
     });
+  };
+
+  // Drag and drop handlers
+  const handleDragStart = (e: React.DragEvent, itemId: string) => {
+    setDraggedItemId(itemId);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e: React.DragEvent, itemId: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverItemId(itemId);
+  };
+
+  const handleDragLeave = () => {
+    setDragOverItemId(null);
+  };
+
+  const handleDrop = (e: React.DragEvent, dropItemId: string) => {
+    e.preventDefault();
+    setDragOverItemId(null);
+
+    if (!draggedItemId || draggedItemId === dropItemId) return;
+
+    // Find the items
+    const draggedIndex = formData.items.findIndex(item => item.id === draggedItemId);
+    const dropIndex = formData.items.findIndex(item => item.id === dropItemId);
+
+    if (draggedIndex === -1 || dropIndex === -1) return;
+
+    // Reorder items
+    setFormData(prev => {
+      const newItems = [...prev.items];
+      const [draggedItem] = newItems.splice(draggedIndex, 1);
+      newItems.splice(dropIndex, 0, draggedItem);
+
+      return {
+        ...prev,
+        items: newItems,
+      };
+    });
+
+    setDraggedItemId(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedItemId(null);
+    setDragOverItemId(null);
   };
 
   // Add new item
@@ -231,7 +283,7 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
               )}
 
               {/* Form Fields - Right Column on Desktop */}
-              <div className={`${formData.imageUrl ? 'lg:flex-1' : 'w-full'} space-y-6`}>
+              <div className={`${formData.imageUrl ? 'lg:flex-1' : 'w-full'} flex flex-col space-y-6`}>
                 {/* Store Information */}
             <div className="bg-gray-50 rounded-lg p-4">
               <h3 className="font-semibold text-gray-800 mb-4">Store Information</h3>
@@ -351,7 +403,7 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
             </div>
 
             {/* Items */}
-            <div className="bg-gray-50 rounded-lg p-4">
+            <div className="bg-gray-50 rounded-lg p-4 flex-1 flex flex-col min-h-0">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-semibold text-gray-800">
                   Items ({formData.items.reduce((sum, item) => sum + (item.quantity || 1), 0)})
@@ -359,10 +411,39 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
               </div>
 
               {/* Items List - All items editable by default */}
-              <div className="max-h-80 overflow-y-auto -mr-2 pr-2">
+              <div className="flex-1 overflow-y-auto -mr-2 pr-2 min-h-0">
+                {/* Drag hint */}
+                {formData.items.length > 1 && (
+                  <p className="text-xs text-gray-500 mb-3 flex items-center gap-1">
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Drag items to reorder them
+                  </p>
+                )}
                 <div className="space-y-3">
                   {formData.items.map((item) => (
-                    <div key={item.id} className="bg-white rounded-lg p-3 border border-gray-200 relative">
+                    <div
+                      key={item.id}
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, item.id)}
+                      onDragOver={(e) => handleDragOver(e, item.id)}
+                      onDragLeave={handleDragLeave}
+                      onDrop={(e) => handleDrop(e, item.id)}
+                      onDragEnd={handleDragEnd}
+                      className={`bg-white rounded-lg p-3 border border-gray-200 relative cursor-move transition-all ${
+                        draggedItemId === item.id ? 'opacity-50 scale-95' : ''
+                      } ${
+                        dragOverItemId === item.id ? 'border-blue-500 border-2 border-dashed' : ''
+                      }`}
+                    >
+                      {/* Drag handle - left side */}
+                      <div className="absolute left-2 top-2 text-gray-400 hover:text-gray-600 cursor-move" title="Drag to reorder">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+                        </svg>
+                      </div>
+
                       {/* Delete button - top right */}
                       <button
                         onClick={() => deleteItem(item.id)}
@@ -373,7 +454,7 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                         </svg>
                       </button>
-                      <div className="space-y-3 pr-6">
+                      <div className="space-y-3 pr-6 pl-6">
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                           <div>
                             <label className="block text-xs text-gray-500 mb-1">Product ID</label>

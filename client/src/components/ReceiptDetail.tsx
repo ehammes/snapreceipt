@@ -108,6 +108,10 @@ const ReceiptDetail: React.FC = () => {
   const [itemSortBy, setItemSortBy] = useState<'receipt' | 'totalPrice'>('receipt');
   const [itemSortOrder, setItemSortOrder] = useState<'asc' | 'desc'>('asc');
 
+  // Drag and drop state
+  const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
+  const [dragOverItemId, setDragOverItemId] = useState<string | null>(null);
+
   // Lock in initial tax when receipt loads (stays constant unless manually edited)
   const [lockedTax, setLockedTax] = useState<number>(0);
 
@@ -492,6 +496,85 @@ const ReceiptDetail: React.FC = () => {
   const handleDeleteItemCancel = () => {
     setDeleteItemModalOpen(false);
     setItemToDelete(null);
+  };
+
+  // Drag and drop handlers
+  const handleDragStart = (e: React.DragEvent, itemId: string) => {
+    setDraggedItemId(itemId);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/html', e.currentTarget.innerHTML);
+  };
+
+  const handleDragOver = (e: React.DragEvent, itemId: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverItemId(itemId);
+  };
+
+  const handleDragLeave = () => {
+    setDragOverItemId(null);
+  };
+
+  const handleDrop = async (e: React.DragEvent, dropItemId: string) => {
+    e.preventDefault();
+    setDragOverItemId(null);
+
+    if (!draggedItemId || draggedItemId === dropItemId || !receipt) return;
+
+    // Find the items
+    const draggedIndex = sortedItems.findIndex(item => item.id === draggedItemId);
+    const dropIndex = sortedItems.findIndex(item => item.id === dropItemId);
+
+    if (draggedIndex === -1 || dropIndex === -1) return;
+
+    // Reorder items
+    const newItems = [...sortedItems];
+    const [draggedItem] = newItems.splice(draggedIndex, 1);
+    newItems.splice(dropIndex, 0, draggedItem);
+
+    // Update item_order values based on new position
+    const itemOrderUpdates = newItems.map((item, index) => ({
+      id: item.id,
+      item_order: index,
+    }));
+
+    // Optimistically update UI
+    setReceipt({
+      ...receipt,
+      items: newItems,
+    });
+
+    // Save to backend
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/api/items/reorder?receiptId=${id}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ items: itemOrderUpdates }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to reorder items');
+      }
+
+      // Refetch to ensure consistency
+      await fetchReceipt();
+    } catch (err) {
+      console.error('Error reordering items:', err);
+      alert('Failed to reorder items');
+      // Revert on error
+      await fetchReceipt();
+    } finally {
+      setDraggedItemId(null);
+    }
+  };
+
+  const handleDragEnd = () => {
+    setDraggedItemId(null);
+    setDragOverItemId(null);
   };
 
   // Calculate subtotal from items safely
@@ -1019,13 +1102,35 @@ const ReceiptDetail: React.FC = () => {
                 </div>
               </div>
 
+              {/* Drag hint */}
+              {itemSortBy === 'receipt' && sortedItems.length > 1 && (
+                <p className="text-xs text-gray-500 mb-3 flex items-center gap-1">
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  Drag items to reorder them
+                </p>
+              )}
+
               {/* Items List */}
               {sortedItems.length > 0 ? (
                 <div className="max-h-96 overflow-y-auto space-y-3 mb-4">
                   {sortedItems.map((item) => (
                     <div
                       key={item.id}
-                      className="bg-gray-50 rounded-lg p-3"
+                      draggable={itemSortBy === 'receipt' && !editingItemId}
+                      onDragStart={(e) => handleDragStart(e, item.id)}
+                      onDragOver={(e) => handleDragOver(e, item.id)}
+                      onDragLeave={handleDragLeave}
+                      onDrop={(e) => handleDrop(e, item.id)}
+                      onDragEnd={handleDragEnd}
+                      className={`bg-gray-50 rounded-lg p-3 transition-all ${
+                        draggedItemId === item.id ? 'opacity-50 scale-95' : ''
+                      } ${
+                        dragOverItemId === item.id ? 'border-2 border-blue-500 border-dashed' : ''
+                      } ${
+                        itemSortBy === 'receipt' && !editingItemId ? 'cursor-move' : ''
+                      }`}
                     >
                       {editingItemId === item.id ? (
                         // Edit Mode
@@ -1131,6 +1236,14 @@ const ReceiptDetail: React.FC = () => {
                       ) : (
                         // View Mode
                         <div className="flex justify-between items-start">
+                          {/* Drag handle - only show in Receipt Order mode */}
+                          {itemSortBy === 'receipt' && (
+                            <div className="mr-3 text-gray-400 hover:text-gray-600 cursor-move" title="Drag to reorder">
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+                              </svg>
+                            </div>
+                          )}
                           <div className="flex-1">
                             <div className="flex items-center gap-2">
                               {item.item_number && (

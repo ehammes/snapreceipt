@@ -331,10 +331,8 @@ class OCRService {
    *   11.99 A
    */
   private extractItems(lines: string[], result: ParsedReceiptData): void {
-    // Lines to skip - these are not product items
+    // Lines to skip - these are not product items and CLEAR pending items queue
     const skipPatterns = [
-      /^COSTCO/i,
-      /^WHOLESALE/i,
       /^SUBTOTAL$/i,
       /^TAX$/i,
       /^\*+\s*TOTAL/i,
@@ -344,18 +342,12 @@ class OCRService {
       /APPROVED/i,
       /VISA/i,
       /MASTER\s*CARD/i,
-      /^MEMBER/i,
-      /^\d{12,}/, // Long numbers (member IDs, barcodes)
-      /^0{4,}\d+\s*\//, // Barcode lines like "0000366341 / 1935001"
       /TERMINAL/i,
       /TRANS\s*ID/i,
       /APPROVAL/i,
       /RECEIPT/i,
       /THANK\s*YOU/i,
       /PLEASE\s*COME/i,
-      /^\d{1,2}\/\d{1,2}\/\d{2,4}/, // Date lines
-      /^#\d+/, // Store numbers like #388
-      /WAREHOUSE/i,
       /SELF.?CHECKOUT/i,
       /^AID:/i,
       /^Seq#/i,
@@ -369,13 +361,11 @@ class OCRService {
       /INSTANT\s*SAVINGS/i,
       /SEASONS\s*GREETINGS/i,
       /HAPPY\s*HOLIDAYS/i,
-      /^\d{10,}$/, // Long number-only lines
       /^[A-Z]\s+\d+\.?\d*%/i, // Tax rate lines like "A 7.5% Tax"
       /TOTAL\s*TAX/i,
       /TOTAL\s*NUMBER/i,
       /^Name:/i,
       /^XX+/i, // Masked card numbers
-      /\b(Street|St|Avenue|Ave|Boulevard|Blvd|Drive|Dr|Road|Rd|Way|Lane|Ln|Court|Ct|Place|Pl|Parkway|Pkwy|Highway|Hwy)\b/i, // Address lines
     ];
 
     // Pattern for item line: optionally starts with tax code (E, A, etc.), then item number (4-7 digits), followed by name
@@ -421,7 +411,25 @@ class OCRService {
     // Track pending discount item numbers from barcode lines (e.g., "0000349046 /1103106")
     // This is used when discount line appears later without item number
     let pendingDiscountItemNumber: string | null = null;
-    let lastBarcodeItemNumber: string | null = null;
+    // Use a queue to track multiple barcode items in order (FIFO)
+    const barcodeItemQueue: string[] = [];
+    // Track standalone tax code from previous line (e.g., "E" on one line, item on next line)
+    let pendingTaxCode: string | null = null;
+
+    // Helper function to calculate total price with discount validation
+    const calculateTotalPrice = (unitPrice: number, quantity: number, discount: number): { total: number; cappedDiscount: number } => {
+      const subtotal = unitPrice * quantity;
+      const cappedDiscount = Math.min(discount, subtotal);
+
+      if (cappedDiscount < discount) {
+        this.debug(`[OCR DEBUG] WARNING: Discount $${discount} exceeds subtotal $${subtotal}, capping at $${cappedDiscount}`);
+      }
+
+      return {
+        total: Math.round((subtotal - cappedDiscount) * 100) / 100,
+        cappedDiscount
+      };
+    };
 
     // Helper function to apply pending discounts - stores them for later application to items
     const applyPendingDiscounts = (prices: Array<{ price: number; order: number }>) => {
@@ -461,115 +469,40 @@ class OCRService {
         let bestMatching: Array<{ itemIdx: number; priceIdx: number }> = [];
 
         if (isConsecutiveBlock) {
-          // Sequential matching with tax code grouping: match items to prices by tax code first, then in order
-          // This handles Costco-style receipts where N items are followed by N prices
-          this.debug('[OCR DEBUG] Using sequential matching (consecutive block detected)');
+          // Distance-based matching: match each item to its nearest price by line number
+          this.debug('[OCR DEBUG] Using distance-based matching (consecutive block detected)');
 
-          // Check if we have tax codes available for grouping
-          const hasItemTaxCodes = pendingItems.some(item => item.taxCode);
-          const hasPriceTaxCodes = pendingPrices.some(price => price.taxCode);
+          const usedPriceIndices = new Set<number>();
+          const usedItemIndices = new Set<number>();
 
-          if (hasItemTaxCodes && hasPriceTaxCodes) {
-            // Group items and prices by tax code
-            this.debug('[OCR DEBUG] Tax codes detected - grouping by tax code before sequential matching');
+          // Match each item to its nearest available price
+          for (let itemIdx = 0; itemIdx < pendingItems.length; itemIdx++) {
+            let bestPriceIdx = -1;
+            let bestDistance = Infinity;
 
-            // Create maps of tax code -> items/prices
-            const itemsByTaxCode = new Map<string, number[]>();
-            const pricesByTaxCode = new Map<string, number[]>();
+            for (let priceIdx = 0; priceIdx < pendingPrices.length; priceIdx++) {
+              if (usedPriceIndices.has(priceIdx)) continue;
 
-            // Group items by tax code
-            pendingItems.forEach((item, idx) => {
-              const code = item.taxCode || 'UNKNOWN';
-              if (!itemsByTaxCode.has(code)) {
-                itemsByTaxCode.set(code, []);
+              const distance = Math.abs(pendingItems[itemIdx].order - pendingPrices[priceIdx].order);
+
+              // Check if item has a discount - price must be >= discount
+              const itemDiscount = discountsByItemNumber.get(pendingItems[itemIdx].itemNumber) || 0;
+              if (itemDiscount > 0 && pendingPrices[priceIdx].price < itemDiscount) {
+                // Skip prices that are smaller than the discount
+                continue;
               }
-              itemsByTaxCode.get(code)!.push(idx);
-            });
 
-            // Group prices by tax code
-            pendingPrices.forEach((price, idx) => {
-              const code = price.taxCode || 'UNKNOWN';
-              if (!pricesByTaxCode.has(code)) {
-                pricesByTaxCode.set(code, []);
-              }
-              pricesByTaxCode.get(code)!.push(idx);
-            });
-
-            this.debug('[OCR DEBUG] Items by tax code:', Array.from(itemsByTaxCode.entries()).map(([code, indices]) =>
-              `${code}: ${indices.map(i => pendingItems[i].name).join(', ')}`
-            ));
-            this.debug('[OCR DEBUG] Prices by tax code:', Array.from(pricesByTaxCode.entries()).map(([code, indices]) =>
-              `${code}: ${indices.map(i => `$${pendingPrices[i].price}`).join(', ')}`
-            ));
-
-            // Match within each tax code group sequentially
-            const usedPriceIndices = new Set<number>();
-            const usedItemIndices = new Set<number>();
-
-            // First pass: Match items with known tax codes to prices with matching tax codes
-            for (const [taxCode, itemIndices] of itemsByTaxCode) {
-              if (taxCode === 'UNKNOWN') continue; // Skip UNKNOWN items in first pass
-
-              const priceIndices = pricesByTaxCode.get(taxCode) || [];
-              const matchCount = Math.min(itemIndices.length, priceIndices.length);
-
-              for (let i = 0; i < matchCount; i++) {
-                bestMatching.push({ itemIdx: itemIndices[i], priceIdx: priceIndices[i] });
-                usedItemIndices.add(itemIndices[i]);
-                usedPriceIndices.add(priceIndices[i]);
-                this.debug(`[OCR DEBUG] Tax code ${taxCode} group: matching ${pendingItems[itemIndices[i]].name} -> $${pendingPrices[priceIndices[i]].price}`);
+              if (distance < bestDistance) {
+                bestDistance = distance;
+                bestPriceIdx = priceIdx;
               }
             }
 
-            // Second pass: Match UNKNOWN items to remaining unmatched prices sequentially
-            const unknownItems = itemsByTaxCode.get('UNKNOWN') || [];
-            const unmatchedPrices: number[] = [];
-            for (let i = 0; i < pendingPrices.length; i++) {
-              if (!usedPriceIndices.has(i)) {
-                unmatchedPrices.push(i);
-              }
-            }
-
-            const matchCount = Math.min(unknownItems.length, unmatchedPrices.length);
-            for (let i = 0; i < matchCount; i++) {
-              const itemIdx = unknownItems[i];
-              const priceIdx = unmatchedPrices[i];
-              if (!usedItemIndices.has(itemIdx)) {
-                bestMatching.push({ itemIdx, priceIdx });
-                usedItemIndices.add(itemIdx);
-                usedPriceIndices.add(priceIdx);
-                this.debug(`[OCR DEBUG] UNKNOWN item matched to remaining price: ${pendingItems[itemIdx].name} -> $${pendingPrices[priceIdx].price}`);
-              }
-            }
-
-            // Third pass: Match any remaining unmatched items to remaining unmatched prices
-            // This handles mismatched tax codes (e.g., item has "I", price has "E")
-            const remainingItems: number[] = [];
-            const remainingPrices: number[] = [];
-
-            for (let i = 0; i < pendingItems.length; i++) {
-              if (!usedItemIndices.has(i)) {
-                remainingItems.push(i);
-              }
-            }
-            for (let i = 0; i < pendingPrices.length; i++) {
-              if (!usedPriceIndices.has(i)) {
-                remainingPrices.push(i);
-              }
-            }
-
-            const remainingMatchCount = Math.min(remainingItems.length, remainingPrices.length);
-            for (let i = 0; i < remainingMatchCount; i++) {
-              const itemIdx = remainingItems[i];
-              const priceIdx = remainingPrices[i];
-              bestMatching.push({ itemIdx, priceIdx });
-              this.debug(`[OCR DEBUG] Remaining item matched (mismatched tax codes): ${pendingItems[itemIdx].name} (${pendingItems[itemIdx].taxCode || '?'}) -> $${pendingPrices[priceIdx].price} (${pendingPrices[priceIdx].taxCode || '?'})`);
-            }
-          } else {
-            // No tax codes - fall back to simple sequential matching
-            this.debug('[OCR DEBUG] No tax codes detected - using simple sequential matching');
-            for (let i = 0; i < pendingItems.length; i++) {
-              bestMatching.push({ itemIdx: i, priceIdx: i });
+            if (bestPriceIdx !== -1) {
+              bestMatching.push({ itemIdx, priceIdx: bestPriceIdx });
+              usedItemIndices.add(itemIdx);
+              usedPriceIndices.add(bestPriceIdx);
+              this.debug(`[OCR DEBUG] Matched by distance: ${pendingItems[itemIdx].name} (line ${pendingItems[itemIdx].order}) -> $${pendingPrices[bestPriceIdx].price} (line ${pendingPrices[bestPriceIdx].order}, distance: ${bestDistance})`);
             }
           }
         } else {
@@ -617,10 +550,10 @@ class OCRService {
           const discountByItemNumber = discountsByItemNumber.get(item.itemNumber) || 0;
           const discountByOrder = discountsByPriceOrder.get(priceInfo.order) || 0;
           const discount = discountByItemNumber || discountByOrder;
-          const totalPrice = Math.round((priceInfo.price - discount) * 100) / 100;
+          const { total, cappedDiscount } = calculateTotalPrice(priceInfo.price, 1, discount);
 
           const distance = Math.abs(item.order - priceInfo.order);
-          this.debug(`[OCR DEBUG] Matched (optimal): ${item.itemNumber} ${item.name} (line ${item.order}) -> $${priceInfo.price} (line ${priceInfo.order}, distance: ${distance}, discount: $${discount})`);
+          this.debug(`[OCR DEBUG] Matched (optimal): ${item.itemNumber} ${item.name} (line ${item.order}) -> $${priceInfo.price} (line ${priceInfo.order}, distance: ${distance}, discount: $${cappedDiscount})`);
 
           // If we used discount by item number, remove it from map to prevent double application
           if (discountByItemNumber > 0) {
@@ -633,8 +566,8 @@ class OCRService {
             name: item.name,
             unitPrice: priceInfo.price,
             quantity: 1,
-            discount: discount,
-            totalPrice: totalPrice,
+            discount: cappedDiscount,
+            totalPrice: total,
             order: item.order,
           });
         }
@@ -649,9 +582,9 @@ class OCRService {
           const discountByItemNumber = discountsByItemNumber.get(item.itemNumber) || 0;
           const discountByOrder = discountsByPriceOrder.get(priceInfo.order) || 0;
           const discount = discountByItemNumber || discountByOrder;
-          const totalPrice = Math.round((priceInfo.price - discount) * 100) / 100;
+          const { total, cappedDiscount } = calculateTotalPrice(priceInfo.price, 1, discount);
 
-          this.debug(`[OCR DEBUG] Matched (unequal): ${item.itemNumber} ${item.name} -> $${priceInfo.price} (discount: $${discount})`);
+          this.debug(`[OCR DEBUG] Matched (unequal): ${item.itemNumber} ${item.name} -> $${priceInfo.price} (discount: $${cappedDiscount})`);
 
           // If we used discount by item number, remove it from map to prevent double application
           if (discountByItemNumber > 0) {
@@ -664,8 +597,8 @@ class OCRService {
             name: item.name,
             unitPrice: priceInfo.price,
             quantity: 1,
-            discount: discount,
-            totalPrice: totalPrice,
+            discount: cappedDiscount,
+            totalPrice: total,
             order: item.order,
           });
         }
@@ -683,11 +616,19 @@ class OCRService {
       // These patterns should be skipped but NOT clear pending item
       // (barcodes and section markers can appear between item name and price due to OCR ordering)
       const skipButKeepPendingPatterns = [
+        /^COSTCO/i, // Store header
+        /^WHOLESALE/i, // Store header
+        /WAREHOUSE/i, // Store header
+        /^MEMBER/i, // Member number lines
+        /^#\d+/, // Store numbers like #388
+        /^\d{1,2}\/\d{1,2}\/\d{2,4}/, // Date lines
+        /^\d{12,}/, // Long numbers (member IDs, barcodes)
+        /\b(Street|St|Avenue|Ave|Boulevard|Blvd|Drive|Dr|Road|Rd|Way|Lane|Ln|Court|Ct|Place|Pl|Parkway|Pkwy|Highway|Hwy)\b/i, // Address lines
         /^0{4,}\d+\s*\//, // Barcode lines like "0000366341 / 1935001"
         /^\d{10,}$/, // Long number-only lines (barcodes)
         /^[A-Z]$/, // Single letter lines (tax codes like "E" that got separated)
         /^[A-Z]{2,6}$/, // Multiple letter lines (tax codes like "EEE" or "EEEEEE")
-        /[^\x00-\x7F]/, // Lines with non-ASCII characters (OCR garbage like "யயயயய")
+        /[^\x00-\x7F]/, // Lines with non-ASCII characters (OCR garbage like "యయயயய")
         /^SUBTOTAL$/i, // Subtotal marker (price may come after in OCR)
         /^TAX$/i, // Tax marker
         /^\*+\s*TOTAL/i, // Total marker
@@ -700,6 +641,13 @@ class OCRService {
 
       // Check if this is a line to skip but keep pending item
       if (skipButKeepPendingPatterns.some(pattern => pattern.test(line))) {
+        // Check for standalone tax code (single letter E, A, F, etc.)
+        if (/^[A-Z]$/.test(line)) {
+          pendingTaxCode = line;
+          this.debug(`[OCR DEBUG] Found standalone tax code: ${line}`);
+          continue;
+        }
+
         // Check for Costco-style barcode discount line: "0000349046 /1103106" or "0000349046 /1103106 5.00"
         const barcodeDiscountMatch = line.match(barcodeDiscountLineRegex);
         if (barcodeDiscountMatch) {
@@ -715,10 +663,10 @@ class OCRService {
             discountsByItemNumber.set(itemNumber, existing + discount);
             this.debug(`[OCR DEBUG] Applied barcode discount $${discount} to item ${itemNumber}`);
           } else {
-            // Barcode line without price - track it for later discount line
+            // Barcode line without price - add to queue for later discount line
             // The discount will appear in a later line ending with '-'
-            lastBarcodeItemNumber = itemNumber;
-            this.debug(`[OCR DEBUG] Tracking barcode item ${itemNumber} for upcoming discount line`);
+            barcodeItemQueue.push(itemNumber);
+            this.debug(`[OCR DEBUG] Added barcode item ${itemNumber} to queue (queue length: ${barcodeItemQueue.length})`);
           }
           continue;
         }
@@ -739,7 +687,9 @@ class OCRService {
           else if (rawItems.length > 0) {
             const lastItem = rawItems[rawItems.length - 1];
             lastItem.discount = (lastItem.discount || 0) + discount;
-            lastItem.totalPrice = Math.round((lastItem.unitPrice * lastItem.quantity - lastItem.discount) * 100) / 100;
+            const { total, cappedDiscount } = calculateTotalPrice(lastItem.unitPrice, lastItem.quantity, lastItem.discount);
+            lastItem.discount = cappedDiscount;
+            lastItem.totalPrice = total;
           } else if (pendingPrices.length > 0) {
             const firstPrice = pendingPrices[0];
             const existing = discountsByPriceOrder.get(firstPrice.order) || 0;
@@ -756,10 +706,10 @@ class OCRService {
         matchPendingItemsAndPrices(); // Try to match before clearing
         pendingItems.length = 0;
         pendingPrices.length = 0;
-        // Also clear barcode item number when we hit skip patterns (moved to different section)
-        if (lastBarcodeItemNumber) {
-          this.debug(`[OCR DEBUG] Clearing barcode item number ${lastBarcodeItemNumber} due to skip pattern`);
-          lastBarcodeItemNumber = null;
+        // Also clear barcode queue when we hit skip patterns (moved to different section)
+        if (barcodeItemQueue.length > 0) {
+          this.debug(`[OCR DEBUG] Clearing barcode queue (${barcodeItemQueue.length} items) due to skip pattern`);
+          barcodeItemQueue.length = 0;
         }
         continue;
       }
@@ -799,16 +749,17 @@ class OCRService {
       if (discountMatch) {
         let itemNumber = discountMatch[1]; // May be undefined if no item number
         let discount = parseFloat(discountMatch[2]);
+        this.debug(`[OCR DEBUG] Discount line matched: "${line}" -> raw amount: ${discountMatch[2]}, hasDecimal: ${discountMatch[2].includes('.')}`);
         // If no decimal in original (e.g., "800" instead of "8.00"), divide by 100
         if (!discountMatch[2].includes('.')) {
           discount = discount / 100;
+          this.debug(`[OCR DEBUG] No decimal found, divided by 100: ${discount}`);
         }
 
-        // If no item number in discount line, check if we have a tracked barcode item number
-        if (!itemNumber && lastBarcodeItemNumber) {
-          itemNumber = lastBarcodeItemNumber;
-          this.debug(`[OCR DEBUG] Discount line $${discount} without item number - using tracked barcode item ${itemNumber}`);
-          lastBarcodeItemNumber = null; // Clear after using
+        // If no item number in discount line, check if we have a queued barcode item number
+        if (!itemNumber && barcodeItemQueue.length > 0) {
+          itemNumber = barcodeItemQueue.shift()!; // Pop from front of queue (FIFO)
+          this.debug(`[OCR DEBUG] Discount line $${discount} without item number - popped barcode item ${itemNumber} from queue (remaining: ${barcodeItemQueue.length})`);
         }
 
         // If discount line includes item number (or we got it from barcode), store it by item number
@@ -834,8 +785,10 @@ class OCRService {
         else if (rawItems.length > 0) {
           const lastItem = rawItems[rawItems.length - 1];
           lastItem.discount = (lastItem.discount || 0) + discount;
-          lastItem.totalPrice = Math.round((lastItem.unitPrice * lastItem.quantity - lastItem.discount) * 100) / 100;
-          this.debug(`[OCR DEBUG] Applied discount $${discount} to last raw item ${lastItem.itemNumber}`);
+          const { total, cappedDiscount } = calculateTotalPrice(lastItem.unitPrice, lastItem.quantity, lastItem.discount);
+          lastItem.discount = cappedDiscount;
+          lastItem.totalPrice = total;
+          this.debug(`[OCR DEBUG] Applied discount $${cappedDiscount} to last raw item ${lastItem.itemNumber}`);
         }
         continue;
       }
@@ -843,6 +796,7 @@ class OCRService {
       // Check for item with price on same line
       const itemWithPriceMatch = line.match(itemWithPriceRegex);
       if (itemWithPriceMatch) {
+        this.debug(`[OCR DEBUG] Found item with price on same line: ${line}`);
         // First, resolve any pending items using orphanPrice if available
         if (pendingItems.length > 0 && orphanPrice) {
           const item = pendingItems.shift()!;
@@ -850,6 +804,7 @@ class OCRService {
           const discountByItemNumber = discountsByItemNumber.get(item.itemNumber) || 0;
           const discountByOrder = discountsByPriceOrder.get(orphanPrice.order) || 0;
           const discount = discountByItemNumber || discountByOrder;
+          const { total, cappedDiscount } = calculateTotalPrice(orphanPrice.price, 1, discount);
 
           // If we used discount by item number, remove it from map to prevent double application
           if (discountByItemNumber > 0) {
@@ -861,8 +816,8 @@ class OCRService {
             name: item.name,
             unitPrice: orphanPrice.price,
             quantity: 1,
-            discount: discount,
-            totalPrice: Math.round((orphanPrice.price - discount) * 100) / 100,
+            discount: cappedDiscount,
+            totalPrice: total,
             order: item.order,
           });
           orphanPrice = null;
@@ -884,16 +839,19 @@ class OCRService {
             discountsByItemNumber.delete(itemNumber);
           }
 
+          // Cap discount at price to prevent negative totals
+          const { total, cappedDiscount } = calculateTotalPrice(price, 1, discount);
+
           rawItems.push({
             itemNumber,
             name,
             unitPrice: price,
             quantity: 1,
-            discount: discount,
-            totalPrice: Math.round((price - discount) * 100) / 100,
+            discount: cappedDiscount,
+            totalPrice: total,
             order: i,  // Use current line number as order
           });
-          this.debug(`[OCR DEBUG] Added item with price on same line: ${name} -> $${price} (discount: $${discount})`);
+          this.debug(`[OCR DEBUG] Added item with price on same line: ${name} -> $${price} (discount: $${cappedDiscount})`);
         } else {
           this.debug(`[OCR DEBUG] SKIPPED item with price - failed validation: name.length=${name.length}, price=${price}`);
         }
@@ -909,9 +867,16 @@ class OCRService {
           matchPendingItemsAndPrices();
         }
 
-        const taxCode = itemMatch[1]; // Extract tax code (E, A, etc.)
+        let taxCode = itemMatch[1]; // Extract tax code (E, A, etc.)
         const itemNumber = itemMatch[2];
         const name = this.cleanItemName(itemMatch[3]);
+
+        // If no tax code on same line but we have a pending tax code from previous line, use it
+        if (!taxCode && pendingTaxCode) {
+          taxCode = pendingTaxCode;
+          this.debug(`[OCR DEBUG] Applied pending tax code ${pendingTaxCode} to item ${itemNumber} ${name}`);
+          pendingTaxCode = null; // Clear after using
+        }
 
         if (name.length >= 2) {
           // Add to pending items queue with tax code
@@ -933,6 +898,7 @@ class OCRService {
       const discountByItemNumber = discountsByItemNumber.get(item.itemNumber) || 0;
       const discountByOrder = discountsByPriceOrder.get(orphanPrice.order) || 0;
       const discount = discountByItemNumber || discountByOrder;
+      const { total, cappedDiscount } = calculateTotalPrice(orphanPrice.price, 1, discount);
 
       // If we used discount by item number, remove it from map to prevent double application
       if (discountByItemNumber > 0) {
@@ -944,8 +910,8 @@ class OCRService {
         name: item.name,
         unitPrice: orphanPrice.price,
         quantity: 1,
-        discount: discount,
-        totalPrice: Math.round((orphanPrice.price - discount) * 100) / 100,
+        discount: cappedDiscount,
+        totalPrice: total,
         order: item.order,
       });
       orphanPrice = null;
@@ -957,7 +923,9 @@ class OCRService {
       if (item.itemNumber && discountsByItemNumber.has(item.itemNumber)) {
         const additionalDiscount = discountsByItemNumber.get(item.itemNumber)!;
         item.discount = (item.discount || 0) + additionalDiscount;
-        item.totalPrice = Math.round((item.unitPrice * item.quantity - item.discount) * 100) / 100;
+        const { total, cappedDiscount } = calculateTotalPrice(item.unitPrice, item.quantity, item.discount);
+        item.discount = cappedDiscount;
+        item.totalPrice = total;
         // Remove from map so it's not applied again during merge
         discountsByItemNumber.delete(item.itemNumber);
       }
@@ -1055,14 +1023,24 @@ class OCRService {
     const lines = text.split('\n').map(l => l.trim());
 
     // Look for tax amount on receipts
-    // Common patterns: "TAX 14.64", "TOTAL TAX 14.64", or standalone "14.64" after TAX label
+    // PRIORITY 1: Look for "TOTAL TAX" specifically (most accurate)
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
+      const totalTaxMatch = line.match(/^TOTAL\s+TAX\s+(\d+\.\d{2})/i);
+      if (totalTaxMatch) {
+        result.taxAmount = parseFloat(totalTaxMatch[1]);
+        this.debug(`[OCR DEBUG] Found TOTAL TAX: ${result.taxAmount}`);
+        return;
+      }
+    }
 
-      // Pattern 1: TAX followed by amount on same line
-      const taxWithAmountMatch = line.match(/^(?:TOTAL\s+)?TAX\s+(\d+\.\d{2})/i);
-      if (taxWithAmountMatch) {
+    // PRIORITY 2: Look for "TAX" followed by amount (but not "TOTAL TAX" which was checked above)
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const taxWithAmountMatch = line.match(/^TAX\s+(\d+\.\d{2})/i);
+      if (taxWithAmountMatch && !/^TOTAL\s+TAX/i.test(line)) {
         result.taxAmount = parseFloat(taxWithAmountMatch[1]);
+        this.debug(`[OCR DEBUG] Found TAX: ${result.taxAmount}`);
         return;
       }
 
@@ -1131,28 +1109,5 @@ class OCRService {
   }
 }
 
-// Create singleton instance
-let ocrServiceInstance: OCRService | null = null;
-
-function getOCRService(): OCRService {
-  if (!ocrServiceInstance) {
-    ocrServiceInstance = new OCRService();
-  }
-  return ocrServiceInstance;
-}
-
-// Export functions that Vercel serverless functions expect
-export async function extractText(imageBuffer: Buffer): Promise<string> {
-  const service = getOCRService();
-  return service.extractText(imageBuffer);
-}
-
-export function parseReceiptText(text: string): ParsedReceiptData {
-  const service = getOCRService();
-  return service.parseReceiptText(text);
-}
-
-export async function processReceipt(imageBuffer: Buffer): Promise<ParsedReceiptData> {
-  const service = getOCRService();
-  return service.processReceipt(imageBuffer);
-}
+export const ocrService = new OCRService();
+export default ocrService;

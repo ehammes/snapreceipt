@@ -59,6 +59,42 @@ router.put('/:itemId', authenticate, async (req: Request, res: Response): Promis
   }
 });
 
+// PATCH /api/items/reorder?receiptId=xxx - Reorder items
+router.patch('/reorder', authenticate, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
+    const { receiptId } = req.query;
+    const { items } = req.body; // Array of { id, item_order }
+
+    if (!receiptId || typeof receiptId !== 'string') {
+      res.status(400).json({ error: 'receiptId query parameter is required' });
+      return;
+    }
+
+    if (!items || !Array.isArray(items)) {
+      res.status(400).json({ error: 'items array is required' });
+      return;
+    }
+
+    // Verify receipt belongs to user
+    const receipt = await ReceiptModel.findById(receiptId, userId);
+    if (!receipt) {
+      res.status(404).json({ error: 'Receipt not found' });
+      return;
+    }
+
+    // Update item_order for each item
+    for (const item of items) {
+      await ItemModel.update(item.id, receiptId, { item_order: item.item_order });
+    }
+
+    res.json({ success: true, message: 'Items reordered' });
+  } catch (error) {
+    console.error('Reorder items error:', error);
+    res.status(500).json({ error: 'Failed to reorder items' });
+  }
+});
+
 // DELETE /api/items/:itemId?receiptId=xxx - Delete an item
 router.delete('/:itemId', authenticate, async (req: Request, res: Response): Promise<void> => {
   try {
