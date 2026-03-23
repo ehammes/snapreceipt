@@ -22,7 +22,7 @@ export const API_ENDPOINTS = {
   SAVE_GUEST: `${API_BASE_URL}/api/receipts/save-guest`,
 
   // Email
-  EMAIL_SEND_SUMMARY: `${API_BASE_URL}/api/email/send-summary`,
+  EMAIL_SEND_SUMMARY: isLocalDev ? `${API_BASE_URL}/api/email/send-summary` : `${API_BASE_URL}/api/auth?action=send-summary`,
 
   // Analytics (consolidated: use ?type=)
   ANALYTICS_SUMMARY: `${API_BASE_URL}/api/analytics?type=summary`,
