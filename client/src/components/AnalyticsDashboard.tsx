@@ -420,6 +420,101 @@ const AnalyticsDashboard: React.FC = () => {
     }
   };
 
+  const exportReceiptsPDF = async () => {
+    setExporting(true);
+    setExportMenuOpen(false);
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        alert('Please log in to export data');
+        navigate('/login');
+        return;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/receipts`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          localStorage.removeItem('token');
+          navigate('/login');
+          return;
+        }
+        throw new Error(`API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      const receipts: Receipt[] = data.receipts || [];
+
+      if (receipts.length === 0) {
+        alert('No receipts to export');
+        return;
+      }
+
+      const { jsPDF } = await import('jspdf');
+      const { default: autoTable } = await import('jspdf-autotable');
+
+      const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.getWidth();
+
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text('SnapReceipt — All Receipts', pageWidth / 2, 16, { align: 'center' });
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Generated ${new Date().toLocaleDateString()}`, pageWidth / 2, 22, { align: 'center' });
+
+      let y = 30;
+
+      receipts.forEach((receipt, index) => {
+        if (index > 0 && y > 240) {
+          doc.addPage();
+          y = 16;
+        }
+
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'bold');
+        doc.text(receipt.store_name || 'Unknown Store', 14, y);
+
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'normal');
+        const date = receipt.purchase_date ? new Date(receipt.purchase_date).toLocaleDateString() : '—';
+        const location = [receipt.store_city, receipt.store_state].filter(Boolean).join(', ');
+        doc.text(`${date}${location ? '  ·  ' + location : ''}`, 14, y + 5);
+
+        y += 12;
+
+        autoTable(doc, {
+          startY: y,
+          head: [['Item', 'Category', 'Qty', 'Unit Price', 'Total']],
+          body: (receipt.items || []).map(item => [
+            item.name || '',
+            item.category || 'Uncategorized',
+            item.quantity ?? 1,
+            `$${Number(item.unit_price || 0).toFixed(2)}`,
+            `$${Number(item.total_price || 0).toFixed(2)}`,
+          ]),
+          foot: [['', '', '', 'Total', `$${Number(receipt.total_amount || 0).toFixed(2)}`]],
+          styles: { fontSize: 8 },
+          headStyles: { fillColor: [37, 99, 235] },
+          footStyles: { fontStyle: 'bold' },
+          margin: { left: 14, right: 14 },
+          theme: 'striped',
+        });
+
+        y = (doc as any).lastAutoTable.finalY + 12;
+      });
+
+      doc.save('receipts.pdf');
+    } catch (err) {
+      console.error('PDF export error:', err);
+      alert('Failed to generate PDF. Please try again.');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const downloadCSV = (csv: string, filename: string) => {
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
@@ -587,6 +682,18 @@ const AnalyticsDashboard: React.FC = () => {
                         <div>
                           <div className="font-medium">Export All Items</div>
                           <div className="text-xs text-gray-500">Detailed item list as CSV</div>
+                        </div>
+                      </button>
+                      <button
+                        onClick={exportReceiptsPDF}
+                        className="flex items-center w-full gap-3 px-4 py-3 text-sm text-left text-gray-700 transition-colors hover:bg-gray-50"
+                      >
+                        <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                        </svg>
+                        <div>
+                          <div className="font-medium">Download PDF</div>
+                          <div className="text-xs text-gray-500">All receipts as a PDF</div>
                         </div>
                       </button>
                     </div>
