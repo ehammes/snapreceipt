@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { CATEGORIES } from '../constants/categories';
 import { API_BASE_URL } from '../config/api';
 
@@ -127,23 +127,23 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
     });
   };
 
-  // Drag and drop handlers
-  const handleDragStart = (e: React.DragEvent, itemId: string) => {
+  // Drag and drop handlers - memoized with useCallback to prevent recreation on every render
+  const handleDragStart = useCallback((e: React.DragEvent, itemId: string) => {
     setDraggedItemId(itemId);
     e.dataTransfer.effectAllowed = 'move';
-  };
+  }, []);
 
-  const handleDragOver = (e: React.DragEvent, itemId: string) => {
+  const handleDragOver = useCallback((e: React.DragEvent, itemId: string) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
     setDragOverItemId(itemId);
-  };
+  }, []);
 
-  const handleDragLeave = () => {
+  const handleDragLeave = useCallback(() => {
     setDragOverItemId(null);
-  };
+  }, []);
 
-  const handleDrop = (e: React.DragEvent, dropItemId: string) => {
+  const handleDrop = useCallback((e: React.DragEvent, dropItemId: string) => {
     e.preventDefault();
     setDragOverItemId(null);
 
@@ -168,12 +168,12 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
     });
 
     setDraggedItemId(null);
-  };
+  }, [draggedItemId, formData.items]);
 
-  const handleDragEnd = () => {
+  const handleDragEnd = useCallback(() => {
     setDraggedItemId(null);
     setDragOverItemId(null);
-  };
+  }, []);
 
   // Add new item
   const handleAddItem = () => {
@@ -208,8 +208,8 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
     setAddingItem(false);
   };
 
-  // Calculate subtotal from items
-  const calculateItemsTotal = () => {
+  // Calculate subtotal from items - memoized to avoid recalculation on every render
+  const calculateItemsTotal = useMemo(() => {
     const total = formData.items.reduce((sum, item) => {
       const price = Number(item.totalPrice) || 0;
       console.log(`[SUBTOTAL DEBUG] ${item.name}: $${price} (sum so far: $${sum + price})`);
@@ -217,12 +217,10 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
     }, 0);
     console.log(`[SUBTOTAL DEBUG] Final total: $${total}, Item count: ${formData.items.length}`);
     return total;
-  };
+  }, [formData.items]);
 
-  // Get effective subtotal (always calculated from items)
-  const getSubtotal = () => {
-    return calculateItemsTotal();
-  };
+  // Get effective subtotal (alias for calculateItemsTotal)
+  const getSubtotal = calculateItemsTotal;
 
   // Get effective tax (override or locked initial value)
   const getTax = () => {
@@ -236,7 +234,7 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
   // Handle tax change - update total automatically
   const handleTaxChange = (value: string) => {
     setTaxOverride(value);
-    const subtotal = getSubtotal();
+    const subtotal = getSubtotal;
     const tax = parseFloat(value) || 0;
     setFormData(prev => ({ ...prev, totalAmount: Math.round((subtotal + tax) * 100) / 100 }));
   };
@@ -263,7 +261,7 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
           </div>
 
           {/* Content */}
-          <div className="max-h-[calc(100vh-200px)] overflow-y-auto">
+          <div className="max-h-[calc(100vh-160px)] sm:max-h-[calc(100vh-200px)] overflow-y-auto">
             <div className={`p-4 sm:p-6 ${formData.imageUrl ? 'lg:flex lg:gap-6' : ''}`}>
               {/* Receipt Image - Left Column on Desktop */}
               {formData.imageUrl && (
@@ -361,10 +359,10 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <span className="text-gray-600">Subtotal</span>
-                        <span className="text-xs text-gray-400">(items: {formatCurrency(calculateItemsTotal())})</span>
+                        <span className="text-xs text-gray-400">(items: {formatCurrency(calculateItemsTotal)})</span>
                       </div>
                       <span className="text-gray-700 font-medium">
-                        {formatCurrency(getSubtotal())}
+                        {formatCurrency(getSubtotal)}
                       </span>
                     </div>
 
@@ -455,24 +453,24 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
                         </svg>
                       </button>
                       <div className="space-y-3 pr-6 pl-6">
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
                           <div>
                             <label className="block text-xs text-gray-500 mb-1">Product ID</label>
                             <input
                               type="text"
                               value={item.itemNumber}
                               onChange={(e) => updateItem(item.id, 'itemNumber', e.target.value)}
-                              className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
+                              className="w-full border border-gray-300 rounded px-2 py-2 text-base sm:text-sm"
                               placeholder="Optional"
                             />
                           </div>
-                          <div className="col-span-2 sm:col-span-3">
+                          <div className="sm:col-span-3">
                             <label className="block text-xs text-gray-500 mb-1">Name</label>
                             <input
                               type="text"
                               value={item.name}
                               onChange={(e) => updateItem(item.id, 'name', e.target.value)}
-                              className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
+                              className="w-full border border-gray-300 rounded px-2 py-2 text-base sm:text-sm"
                             />
                           </div>
                         </div>
@@ -491,7 +489,7 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
                                   const value = parseFloat(e.target.value) || 0;
                                   updateItem(item.id, 'unitPrice', parseFloat(value.toFixed(2)));
                                 }}
-                                className="w-full border border-gray-300 rounded pl-5 pr-2 py-1 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                className="w-full border border-gray-300 rounded pl-5 pr-2 py-2 text-base sm:text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                               />
                             </div>
                           </div>
@@ -502,7 +500,7 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
                               min="1"
                               value={item.quantity}
                               onChange={(e) => updateItem(item.id, 'quantity', parseInt(e.target.value) || 1)}
-                              className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
+                              className="w-full border border-gray-300 rounded px-2 py-2 text-base sm:text-sm"
                             />
                           </div>
                           <div>
@@ -519,7 +517,7 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
                                   const value = parseFloat(e.target.value) || 0;
                                   updateItem(item.id, 'discount', parseFloat(value.toFixed(2)));
                                 }}
-                                className="w-full border border-gray-300 rounded pl-5 pr-2 py-1 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                className="w-full border border-gray-300 rounded pl-5 pr-2 py-2 text-base sm:text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                 placeholder="0.00"
                               />
                             </div>
@@ -529,7 +527,7 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
                             <select
                               value={item.category}
                               onChange={(e) => updateItem(item.id, 'category', e.target.value)}
-                              className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
+                              className="w-full border border-gray-300 rounded px-2 py-2 text-base sm:text-sm"
                             >
                               {CATEGORIES.map((cat) => (
                                 <option key={cat} value={cat}>{cat}</option>
@@ -558,7 +556,7 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
                 <div className="mt-4 bg-white rounded-lg p-3 border-2 border-dashed border-blue-300">
                   <h4 className="text-sm font-medium text-gray-700 mb-3">Add New Item</h4>
                   <div className="space-y-3">
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
                       <div>
                         <label className="block text-xs text-gray-500 mb-1">Product ID</label>
                         <input
@@ -566,17 +564,17 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
                           value={newItem.itemNumber}
                           onChange={(e) => setNewItem(prev => ({ ...prev, itemNumber: e.target.value }))}
                           placeholder="Optional"
-                          className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
+                          className="w-full border border-gray-300 rounded px-2 py-2 text-base sm:text-sm"
                         />
                       </div>
-                      <div className="col-span-2 sm:col-span-3">
+                      <div className="sm:col-span-3">
                         <label className="block text-xs text-gray-500 mb-1">Name *</label>
                         <input
                           type="text"
                           value={newItem.name}
                           onChange={(e) => setNewItem(prev => ({ ...prev, name: e.target.value }))}
                           placeholder="Item name"
-                          className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
+                          className="w-full border border-gray-300 rounded px-2 py-2 text-base sm:text-sm"
                         />
                       </div>
                     </div>
@@ -596,7 +594,7 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
                               setNewItem(prev => ({ ...prev, unitPrice: parseFloat(value.toFixed(2)) }));
                             }}
                             placeholder="0.00"
-                            className="w-full border border-gray-300 rounded pl-5 pr-2 py-1 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            className="w-full border border-gray-300 rounded pl-5 pr-2 py-2 text-base sm:text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                           />
                         </div>
                       </div>
@@ -607,7 +605,7 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
                           min="1"
                           value={newItem.quantity}
                           onChange={(e) => setNewItem(prev => ({ ...prev, quantity: parseInt(e.target.value) || 1 }))}
-                          className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
+                          className="w-full border border-gray-300 rounded px-2 py-2 text-base sm:text-sm"
                         />
                       </div>
                       <div>
@@ -625,7 +623,7 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
                               setNewItem(prev => ({ ...prev, discount: parseFloat(value.toFixed(2)) }));
                             }}
                             placeholder="0.00"
-                            className="w-full border border-gray-300 rounded pl-5 pr-2 py-1 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            className="w-full border border-gray-300 rounded pl-5 pr-2 py-2 text-base sm:text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                           />
                         </div>
                       </div>
@@ -634,7 +632,7 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
                         <select
                           value={newItem.category}
                           onChange={(e) => setNewItem(prev => ({ ...prev, category: e.target.value }))}
-                          className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
+                          className="w-full border border-gray-300 rounded px-2 py-2 text-base sm:text-sm"
                         >
                           {CATEGORIES.map((cat) => (
                             <option key={cat} value={cat}>{cat}</option>

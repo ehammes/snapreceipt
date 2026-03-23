@@ -67,6 +67,7 @@ const ReceiptDetail: React.FC = () => {
     storeCity: '',
     storeState: '',
     storeZip: '',
+
     purchaseDate: '',
   });
 
@@ -498,53 +499,45 @@ const ReceiptDetail: React.FC = () => {
     setItemToDelete(null);
   };
 
-  // Drag and drop handlers
-  const handleDragStart = (e: React.DragEvent, itemId: string) => {
+  // Drag and drop handlers (only active in receipt order mode)
+  const handleDragStart = useCallback((e: React.DragEvent, itemId: string) => {
     setDraggedItemId(itemId);
     e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/html', e.currentTarget.innerHTML);
-  };
+  }, []);
 
-  const handleDragOver = (e: React.DragEvent, itemId: string) => {
+  const handleDragOver = useCallback((e: React.DragEvent, itemId: string) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
     setDragOverItemId(itemId);
-  };
+  }, []);
 
-  const handleDragLeave = () => {
+  const handleDragLeave = useCallback(() => {
     setDragOverItemId(null);
-  };
+  }, []);
 
-  const handleDrop = async (e: React.DragEvent, dropItemId: string) => {
+  const handleDrop = useCallback(async (e: React.DragEvent, dropItemId: string) => {
     e.preventDefault();
     setDragOverItemId(null);
 
     if (!draggedItemId || draggedItemId === dropItemId || !receipt) return;
 
-    // Find the items
     const draggedIndex = sortedItems.findIndex(item => item.id === draggedItemId);
     const dropIndex = sortedItems.findIndex(item => item.id === dropItemId);
 
     if (draggedIndex === -1 || dropIndex === -1) return;
 
-    // Reorder items
     const newItems = [...sortedItems];
     const [draggedItem] = newItems.splice(draggedIndex, 1);
     newItems.splice(dropIndex, 0, draggedItem);
 
-    // Update item_order values based on new position
     const itemOrderUpdates = newItems.map((item, index) => ({
       id: item.id,
       item_order: index,
     }));
 
     // Optimistically update UI
-    setReceipt({
-      ...receipt,
-      items: newItems,
-    });
+    setReceipt({ ...receipt, items: newItems });
 
-    // Save to backend
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(`${API_BASE_URL}/api/items/reorder?receiptId=${id}`, {
@@ -560,22 +553,20 @@ const ReceiptDetail: React.FC = () => {
         throw new Error('Failed to reorder items');
       }
 
-      // Refetch to ensure consistency
       await fetchReceipt();
     } catch (err) {
       console.error('Error reordering items:', err);
       alert('Failed to reorder items');
-      // Revert on error
       await fetchReceipt();
     } finally {
       setDraggedItemId(null);
     }
-  };
+  }, [draggedItemId, sortedItems, receipt, id, fetchReceipt]);
 
-  const handleDragEnd = () => {
+  const handleDragEnd = useCallback(() => {
     setDraggedItemId(null);
     setDragOverItemId(null);
-  };
+  }, []);
 
   // Calculate subtotal from items safely
   const calculateSubtotal = () => {
@@ -644,8 +635,8 @@ const ReceiptDetail: React.FC = () => {
   // Loading state
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <p className="text-gray-600 text-lg">Loading receipt...</p>
+      <div className="flex items-center justify-center min-h-screen bg-gray-100">
+        <p className="text-lg text-gray-600">Loading receipt...</p>
       </div>
     );
   }
@@ -653,13 +644,13 @@ const ReceiptDetail: React.FC = () => {
   // Not found state
   if (notFound) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+      <div className="flex items-center justify-center min-h-screen bg-gray-100">
         <div className="text-center">
-          <h2 className="text-xl font-semibold text-gray-800 mb-2">Receipt not found</h2>
-          <p className="text-gray-600 mb-4">The receipt you're looking for doesn't exist.</p>
+          <h2 className="mb-2 text-xl font-semibold text-gray-800">Receipt not found</h2>
+          <p className="mb-4 text-gray-600">The receipt you're looking for doesn't exist.</p>
           <button
             onClick={() => navigate('/receipts')}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg"
+            className="px-6 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700"
           >
             Back to Receipts
           </button>
@@ -673,13 +664,13 @@ const ReceiptDetail: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 p-4 sm:p-6">
+    <div className="min-h-screen p-4 bg-gray-100 sm:p-6">
       <div className="max-w-6xl mx-auto">
         {/* Header with Back button and Actions menu */}
-        <div className="flex justify-between items-center mb-4">
+        <div className="flex items-center justify-between mb-4">
           <button
             onClick={() => navigate('/receipts')}
-            className="flex items-center gap-2 text-gray-600 hover:text-gray-800 transition-colors"
+            className="flex items-center gap-2 text-gray-600 transition-colors hover:text-gray-800"
           >
             <svg
               className="w-5 h-5"
@@ -701,7 +692,7 @@ const ReceiptDetail: React.FC = () => {
           <div className="relative">
             <button
               onClick={() => setMenuOpen(!menuOpen)}
-              className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+              className="p-2 text-gray-500 transition-colors rounded-lg hover:text-gray-700 hover:bg-gray-100"
             >
               <svg
                 className="w-6 h-6"
@@ -726,13 +717,13 @@ const ReceiptDetail: React.FC = () => {
                   className="fixed inset-0 z-10"
                   onClick={() => setMenuOpen(false)}
                 />
-                <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20">
+                <div className="absolute right-0 z-20 w-48 py-1 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg">
                   <button
                     onClick={() => {
                       setMenuOpen(false);
                       handleDeleteClick();
                     }}
-                    className="w-full px-4 py-2 text-left text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors"
+                    className="flex items-center w-full gap-2 px-4 py-2 text-left text-red-600 transition-colors hover:bg-red-50"
                   >
                     <svg
                       className="w-4 h-4"
@@ -756,16 +747,16 @@ const ReceiptDetail: React.FC = () => {
         </div>
 
         {/* Two-column layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           {/* Left Column - Receipt Image */}
-          <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6 lg:sticky lg:top-6 lg:self-start">
-            <h2 className="font-semibold text-lg text-gray-800 mb-4">Receipt Image</h2>
+          <div className="p-4 bg-white shadow-lg rounded-xl sm:p-6 lg:sticky lg:top-6 lg:self-start">
+            <h2 className="mb-4 text-lg font-semibold text-gray-800">Receipt Image</h2>
             <div className="relative">
               {receipt.image_url ? (
                 <>
                   <div className="relative">
                     {/* Main Image */}
-                    <div className="relative overflow-hidden rounded-lg bg-gray-100">
+                    <div className="relative overflow-hidden bg-gray-100 rounded-lg">
                       <img
                         src={receipt.image_url.startsWith('data:') ? receipt.image_url : `${API_BASE_URL}${receipt.image_url}`}
                         alt={`Receipt from ${receipt.store_name || 'Store'} dated ${new Date(receipt.purchase_date).toLocaleDateString()}`}
@@ -785,7 +776,7 @@ const ReceiptDetail: React.FC = () => {
                       {/* Hover indicator box showing magnified area - desktop only */}
                       {hoverZoom && (
                         <div
-                          className="hidden lg:block absolute border-2 border-blue-500 bg-blue-500/10 pointer-events-none"
+                          className="absolute hidden border-2 border-blue-500 pointer-events-none lg:block bg-blue-500/10"
                           style={{
                             width: '33.33%',
                             height: '33.33%',
@@ -799,12 +790,12 @@ const ReceiptDetail: React.FC = () => {
                     {/* Zoom Panel - Absolutely positioned to the right, desktop only */}
                     {hoverZoom && (
                       <div
-                        className="hidden lg:block absolute top-0 left-full ml-4 w-80 h-96 overflow-hidden rounded-lg bg-white border-4 border-blue-500 shadow-2xl pointer-events-none z-50"
+                        className="absolute top-0 z-50 hidden ml-4 overflow-hidden bg-white border-4 border-blue-500 rounded-lg shadow-2xl pointer-events-none lg:block left-full w-80 h-96"
                       >
                         <img
                           src={receipt.image_url.startsWith('data:') ? receipt.image_url : `${API_BASE_URL}${receipt.image_url}`}
                           alt="Zoomed view"
-                          className="w-full h-full object-contain"
+                          className="object-contain w-full h-full"
                           style={{
                             transform: 'scale(3.6)',
                             transformOrigin: `${zoomPosition.x}% ${zoomPosition.y}%`,
@@ -813,7 +804,7 @@ const ReceiptDetail: React.FC = () => {
                       </div>
                     )}
                   </div>
-                  <p className="text-xs text-gray-400 text-center mt-2 flex items-center justify-center gap-1">
+                  <p className="flex items-center justify-center gap-1 mt-2 text-xs text-center text-gray-400">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
                     </svg>
@@ -824,10 +815,10 @@ const ReceiptDetail: React.FC = () => {
               ) : (
                 <div className="aspect-[3/4] bg-gray-100 rounded-lg flex items-center justify-center">
                   <div className="text-center">
-                    <svg className="w-12 h-12 mx-auto text-gray-300 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-12 h-12 mx-auto mb-2 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
-                    <p className="text-gray-400 text-sm">No image available</p>
+                    <p className="text-sm text-gray-400">No image available</p>
                   </div>
                 </div>
               )}
@@ -840,13 +831,13 @@ const ReceiptDetail: React.FC = () => {
             <h1 className="text-2xl font-bold text-gray-800">Receipt Details</h1>
 
             {/* Store Information Card */}
-            <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="font-semibold text-lg text-gray-800">Store Information</h2>
+            <div className="p-4 bg-white shadow-lg rounded-xl sm:p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-gray-800">Store Information</h2>
                 {!editingStore && (
                   <button
                     onClick={() => setEditingStore(true)}
-                    className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+                    className="text-sm font-medium text-blue-600 hover:text-blue-700"
                   >
                     Edit
                   </button>
@@ -856,68 +847,68 @@ const ReceiptDetail: React.FC = () => {
               {editingStore ? (
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm text-gray-600 mb-1">Store Name</label>
+                    <label className="block mb-1 text-sm text-gray-600">Store Name</label>
                     <input
                       type="text"
                       value={storeForm.storeName}
                       onChange={(e) => setStoreForm({ ...storeForm, storeName: e.target.value })}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm text-gray-600 mb-1">Street Address</label>
+                    <label className="block mb-1 text-sm text-gray-600">Street Address</label>
                     <input
                       type="text"
                       value={storeForm.storeLocation}
                       onChange={(e) => setStoreForm({ ...storeForm, storeLocation: e.target.value })}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm text-gray-600 mb-1">City</label>
+                      <label className="block mb-1 text-sm text-gray-600">City</label>
                       <input
                         type="text"
                         value={storeForm.storeCity}
                         onChange={(e) => setStoreForm({ ...storeForm, storeCity: e.target.value })}
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm text-gray-600 mb-1">State</label>
+                      <label className="block mb-1 text-sm text-gray-600">State</label>
                       <input
                         type="text"
                         value={storeForm.storeState}
                         onChange={(e) => setStoreForm({ ...storeForm, storeState: e.target.value })}
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         maxLength={2}
                       />
                     </div>
                   </div>
                   <div>
-                    <label className="block text-sm text-gray-600 mb-1">ZIP Code</label>
+                    <label className="block mb-1 text-sm text-gray-600">ZIP Code</label>
                     <input
                       type="text"
                       value={storeForm.storeZip}
                       onChange={(e) => setStoreForm({ ...storeForm, storeZip: e.target.value })}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       maxLength={10}
                     />
                   </div>
                   <div>
-                    <label className="block text-sm text-gray-600 mb-1">Purchase Date</label>
+                    <label className="block mb-1 text-sm text-gray-600">Purchase Date</label>
                     <input
                       type="date"
                       value={formatDateForInput(storeForm.purchaseDate)}
                       onChange={(e) => setStoreForm({ ...storeForm, purchaseDate: e.target.value })}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                   </div>
                   <div className="flex gap-3">
                     <button
                       onClick={handleSaveStoreInfo}
                       disabled={saving}
-                      className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50"
+                      className="px-4 py-2 font-medium text-white transition-colors bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
                     >
                       {saving ? 'Saving...' : 'Save Store Info'}
                     </button>
@@ -933,7 +924,7 @@ const ReceiptDetail: React.FC = () => {
                           purchaseDate: receipt.purchase_date || '',
                         });
                       }}
-                      className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg font-medium transition-colors"
+                      className="px-4 py-2 font-medium text-gray-700 transition-colors bg-gray-200 rounded-lg hover:bg-gray-300"
                     >
                       Cancel
                     </button>
@@ -964,14 +955,14 @@ const ReceiptDetail: React.FC = () => {
                     </p>
                   </div>
                   {/* Subtotal, Tax, and Total */}
-                  <div className="pt-3 border-t border-gray-200 space-y-2">
+                  <div className="pt-3 space-y-2 border-t border-gray-200">
                     {/* Receipt Totals Header */}
-                    <div className="flex justify-between items-center mb-2">
+                    <div className="flex items-center justify-between mb-2">
                       <h3 className="font-semibold text-gray-800">Receipt Totals</h3>
                       {!editingTotal && (
                         <button
                           onClick={handleEditTotalClick}
-                          className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+                          className="text-sm font-medium text-blue-600 hover:text-blue-700"
                         >
                           Edit
                         </button>
@@ -982,17 +973,17 @@ const ReceiptDetail: React.FC = () => {
                       <div className="space-y-3">
                         {/* Subtotal - calculated from items */}
                         <div className="flex items-center justify-between">
-                          <span className="text-gray-500 text-sm">Subtotal</span>
-                          <span className="text-gray-700 font-medium">
+                          <span className="text-sm text-gray-500">Subtotal</span>
+                          <span className="font-medium text-gray-700">
                             {formatCurrency(parseFloat(subtotalForm))}
                           </span>
                         </div>
 
                         {/* Editable Tax */}
                         <div className="flex items-center justify-between">
-                          <span className="text-gray-500 text-sm">Tax</span>
+                          <span className="text-sm text-gray-500">Tax</span>
                           <div className="relative w-28">
-                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
+                            <span className="absolute text-sm text-gray-400 -translate-y-1/2 left-2 top-1/2">$</span>
                             <input
                               type="number"
                               step="0.01"
@@ -1011,7 +1002,7 @@ const ReceiptDetail: React.FC = () => {
                         {/* Total (auto-calculated) */}
                         <div className="pt-2 border-t border-gray-100">
                           <div className="flex items-center justify-between">
-                            <span className="text-gray-800 font-semibold">Total</span>
+                            <span className="font-semibold text-gray-800">Total</span>
                             <span className="text-xl font-bold text-green-600">
                               {formatCurrency(parseFloat(totalForm) || 0)}
                             </span>
@@ -1023,14 +1014,14 @@ const ReceiptDetail: React.FC = () => {
                           <button
                             onClick={handleSaveTotal}
                             disabled={saving || !totalForm}
-                            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                            className="flex-1 px-3 py-2 text-sm font-medium text-white transition-colors bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
                           >
                             {saving ? 'Saving...' : 'Save'}
                           </button>
                           <button
                             onClick={handleCancelEditTotal}
                             disabled={saving}
-                            className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
+                            className="flex-1 px-3 py-2 text-sm font-medium text-gray-700 transition-colors bg-gray-200 rounded-lg hover:bg-gray-300"
                           >
                             Cancel
                           </button>
@@ -1041,23 +1032,23 @@ const ReceiptDetail: React.FC = () => {
                       <>
                         {/* Subtotal - calculated from items */}
                         <div className="flex items-center justify-between">
-                          <span className="text-gray-500 text-sm">Subtotal</span>
-                          <span className="text-gray-700 font-medium">
+                          <span className="text-sm text-gray-500">Subtotal</span>
+                          <span className="font-medium text-gray-700">
                             {formatCurrency(calculateSubtotal())}
                           </span>
                         </div>
 
                         {/* Tax - calculated as total minus subtotal */}
                         <div className="flex items-center justify-between">
-                          <span className="text-gray-500 text-sm">Tax</span>
-                          <span className="text-gray-700 font-medium">
+                          <span className="text-sm text-gray-500">Tax</span>
+                          <span className="font-medium text-gray-700">
                             {formatCurrency(calculateTax())}
                           </span>
                         </div>
 
                         {/* Total */}
                         <div className="flex items-center justify-between pt-2 border-t border-gray-100">
-                          <span className="text-gray-800 font-semibold">Total</span>
+                          <span className="font-semibold text-gray-800">Total</span>
                           <span className="text-xl font-bold text-green-600">
                             {formatCurrency(receipt.total_amount)}
                           </span>
@@ -1070,23 +1061,23 @@ const ReceiptDetail: React.FC = () => {
             </div>
 
             {/* Items List Card */}
-            <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-4">
-                <h2 className="font-semibold text-lg text-gray-800">
+            <div className="p-4 bg-white shadow-lg rounded-xl sm:p-6">
+              <div className="flex flex-col items-start justify-between gap-2 mb-4 sm:flex-row sm:items-center">
+                <h2 className="text-lg font-semibold text-gray-800">
                   Items ({receipt.items?.reduce((sum, item) => sum + (item.quantity || 1), 0) || 0})
                 </h2>
                 <div className="flex items-center gap-2">
                   <select
                     value={itemSortBy}
                     onChange={(e) => setItemSortBy(e.target.value as 'receipt' | 'totalPrice')}
-                    className="text-sm border border-gray-300 rounded-lg px-2 py-1 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="px-2 py-1 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
                     <option value="receipt">Receipt Order</option>
                     <option value="totalPrice">Total Price</option>
                   </select>
                   <button
                     onClick={() => setItemSortOrder(itemSortOrder === 'asc' ? 'desc' : 'asc')}
-                    className="p-1 text-gray-600 hover:text-blue-600 hover:bg-gray-100 rounded"
+                    className="p-1 text-gray-600 rounded hover:text-blue-600 hover:bg-gray-100"
                     title={itemSortOrder === 'asc' ? 'Ascending' : 'Descending'}
                   >
                     {itemSortOrder === 'asc' ? (
@@ -1102,34 +1093,24 @@ const ReceiptDetail: React.FC = () => {
                 </div>
               </div>
 
-              {/* Drag hint */}
-              {itemSortBy === 'receipt' && sortedItems.length > 1 && (
-                <p className="text-xs text-gray-500 mb-3 flex items-center gap-1">
-                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  Drag items to reorder them
-                </p>
-              )}
-
               {/* Items List */}
               {sortedItems.length > 0 ? (
-                <div className="max-h-96 overflow-y-auto space-y-3 mb-4">
+                <div className="mb-4 space-y-3 overflow-y-auto max-h-96">
                   {sortedItems.map((item) => (
                     <div
                       key={item.id}
-                      draggable={itemSortBy === 'receipt' && !editingItemId}
-                      onDragStart={(e) => handleDragStart(e, item.id)}
-                      onDragOver={(e) => handleDragOver(e, item.id)}
-                      onDragLeave={handleDragLeave}
-                      onDrop={(e) => handleDrop(e, item.id)}
-                      onDragEnd={handleDragEnd}
-                      className={`bg-gray-50 rounded-lg p-3 transition-all ${
+                      draggable={itemSortBy === 'receipt'}
+                      onDragStart={itemSortBy === 'receipt' ? (e) => handleDragStart(e, item.id) : undefined}
+                      onDragOver={itemSortBy === 'receipt' ? (e) => handleDragOver(e, item.id) : undefined}
+                      onDragLeave={itemSortBy === 'receipt' ? handleDragLeave : undefined}
+                      onDrop={itemSortBy === 'receipt' ? (e) => handleDrop(e, item.id) : undefined}
+                      onDragEnd={itemSortBy === 'receipt' ? handleDragEnd : undefined}
+                      className={`p-3 rounded-lg bg-gray-50 transition-all ${
+                        itemSortBy === 'receipt' ? 'cursor-move' : ''
+                      } ${
                         draggedItemId === item.id ? 'opacity-50 scale-95' : ''
                       } ${
-                        dragOverItemId === item.id ? 'border-2 border-blue-500 border-dashed' : ''
-                      } ${
-                        itemSortBy === 'receipt' && !editingItemId ? 'cursor-move' : ''
+                        dragOverItemId === item.id ? 'border-2 border-blue-400 border-dashed' : ''
                       }`}
                     >
                       {editingItemId === item.id ? (
@@ -1137,30 +1118,30 @@ const ReceiptDetail: React.FC = () => {
                         <div className="space-y-3">
                           <div className="grid grid-cols-4 gap-2">
                             <div>
-                              <label className="block text-xs text-gray-500 mb-1">Product ID</label>
+                              <label className="block mb-1 text-xs text-gray-500">Product ID</label>
                               <input
                                 type="text"
                                 value={editItemForm.itemNumber}
                                 onChange={(e) => setEditItemForm({ ...editItemForm, itemNumber: e.target.value })}
                                 placeholder="Optional"
-                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                               />
                             </div>
                             <div className="col-span-3">
-                              <label className="block text-xs text-gray-500 mb-1">Item Name</label>
+                              <label className="block mb-1 text-xs text-gray-500">Item Name</label>
                               <input
                                 type="text"
                                 value={editItemForm.name}
                                 onChange={(e) => setEditItemForm({ ...editItemForm, name: e.target.value })}
-                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                               />
                             </div>
                           </div>
                           <div className="grid grid-cols-8 gap-2">
                             <div className="col-span-2">
-                              <label className="block text-xs text-gray-500 mb-1">Unit Price</label>
+                              <label className="block mb-1 text-xs text-gray-500">Unit Price</label>
                               <div className="relative">
-                                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
+                                <span className="absolute text-xs text-gray-400 -translate-y-1/2 left-2 top-1/2">$</span>
                                 <input
                                   type="number"
                                   step="0.01"
@@ -1176,19 +1157,19 @@ const ReceiptDetail: React.FC = () => {
                               </div>
                             </div>
                             <div className="col-span-1">
-                              <label className="block text-xs text-gray-500 mb-1">Quantity</label>
+                              <label className="block mb-1 text-xs text-gray-500">Quantity</label>
                               <input
                                 type="number"
                                 min="1"
                                 value={editItemForm.quantity}
                                 onChange={(e) => setEditItemForm({ ...editItemForm, quantity: e.target.value })}
-                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                               />
                             </div>
                             <div className="col-span-2">
-                              <label className="block text-xs text-gray-500 mb-1">Discount</label>
+                              <label className="block mb-1 text-xs text-gray-500">Discount</label>
                               <div className="relative">
-                                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
+                                <span className="absolute text-xs text-gray-400 -translate-y-1/2 left-2 top-1/2">$</span>
                                 <input
                                   type="number"
                                   step="0.01"
@@ -1204,11 +1185,11 @@ const ReceiptDetail: React.FC = () => {
                               </div>
                             </div>
                             <div className="col-span-3">
-                              <label className="block text-xs text-gray-500 mb-1">Category</label>
+                              <label className="block mb-1 text-xs text-gray-500">Category</label>
                               <select
                                 value={editItemForm.category}
                                 onChange={(e) => setEditItemForm({ ...editItemForm, category: e.target.value })}
-                                className="w-full border border-gray-300 rounded-lg px-2 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                className="w-full px-2 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                               >
                                 {CATEGORIES.map((cat) => (
                                   <option key={cat} value={cat}>{cat}</option>
@@ -1220,14 +1201,14 @@ const ReceiptDetail: React.FC = () => {
                             <button
                               onClick={handleEditItemSave}
                               disabled={saving || !editItemForm.name || !editItemForm.unitPrice}
-                              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                              className="flex-1 px-3 py-2 text-sm font-medium text-white transition-colors bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
                             >
                               {saving ? 'Saving...' : 'Save'}
                             </button>
                             <button
                               onClick={handleEditItemCancel}
                               disabled={saving}
-                              className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
+                              className="flex-1 px-3 py-2 text-sm font-medium text-gray-700 transition-colors bg-gray-200 rounded-lg hover:bg-gray-300"
                             >
                               Cancel
                             </button>
@@ -1235,11 +1216,10 @@ const ReceiptDetail: React.FC = () => {
                         </div>
                       ) : (
                         // View Mode
-                        <div className="flex justify-between items-start">
-                          {/* Drag handle - only show in Receipt Order mode */}
+                        <div className="flex items-start justify-between">
                           {itemSortBy === 'receipt' && (
-                            <div className="mr-3 text-gray-400 hover:text-gray-600 cursor-move" title="Drag to reorder">
-                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <div className="mt-0.5 mr-2 text-gray-400 cursor-move hover:text-gray-600 shrink-0" title="Drag to reorder">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
                               </svg>
                             </div>
@@ -1247,7 +1227,7 @@ const ReceiptDetail: React.FC = () => {
                           <div className="flex-1">
                             <div className="flex items-center gap-2">
                               {item.item_number && (
-                                <span className="text-xs text-gray-400 font-mono">
+                                <span className="font-mono text-xs text-gray-400">
                                   {item.item_number}
                                 </span>
                               )}
@@ -1279,7 +1259,7 @@ const ReceiptDetail: React.FC = () => {
                             </span>
                             <button
                               onClick={() => handleEditItemClick(item)}
-                              className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                              className="p-1 text-gray-400 transition-colors hover:text-blue-600"
                               title="Edit item"
                             >
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1288,7 +1268,7 @@ const ReceiptDetail: React.FC = () => {
                             </button>
                             <button
                               onClick={() => handleDeleteItemClick(item)}
-                              className="p-1 text-gray-400 hover:text-red-600 transition-colors"
+                              className="p-1 text-gray-400 transition-colors hover:text-red-600"
                               title="Delete item"
                             >
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1302,41 +1282,41 @@ const ReceiptDetail: React.FC = () => {
                   ))}
                 </div>
               ) : (
-                <p className="text-gray-500 text-sm mb-4">
+                <p className="mb-4 text-sm text-gray-500">
                   No items added yet. Add items to track purchases.
                 </p>
               )}
 
               {/* Add Item Form */}
               {addingItem ? (
-                <div className="border-t border-gray-200 pt-4 space-y-4">
+                <div className="pt-4 space-y-4 border-t border-gray-200">
                   <div className="grid grid-cols-4 gap-4">
                     <div>
-                      <label className="block text-sm text-gray-600 mb-1">Product ID</label>
+                      <label className="block mb-1 text-sm text-gray-600">Product ID</label>
                       <input
                         type="text"
                         value={itemForm.itemNumber}
                         onChange={(e) => setItemForm({ ...itemForm, itemNumber: e.target.value })}
                         placeholder="Optional"
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       />
                     </div>
                     <div className="col-span-3">
-                      <label className="block text-sm text-gray-600 mb-1">Item Name</label>
+                      <label className="block mb-1 text-sm text-gray-600">Item Name</label>
                       <input
                         type="text"
                         value={itemForm.name}
                         onChange={(e) => setItemForm({ ...itemForm, name: e.target.value })}
                         placeholder="Enter item name"
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       />
                     </div>
                   </div>
                   <div className="grid grid-cols-3 gap-4">
                     <div>
-                      <label className="block text-sm text-gray-600 mb-1">Unit Price</label>
+                      <label className="block mb-1 text-sm text-gray-600">Unit Price</label>
                       <div className="relative">
-                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
+                        <span className="absolute text-sm text-gray-400 -translate-y-1/2 left-2 top-1/2">$</span>
                         <input
                           type="number"
                           step="0.01"
@@ -1353,19 +1333,19 @@ const ReceiptDetail: React.FC = () => {
                       </div>
                     </div>
                     <div>
-                      <label className="block text-sm text-gray-600 mb-1">Quantity</label>
+                      <label className="block mb-1 text-sm text-gray-600">Quantity</label>
                       <input
                         type="number"
                         min="1"
                         value={itemForm.quantity}
                         onChange={(e) => setItemForm({ ...itemForm, quantity: e.target.value })}
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm text-gray-600 mb-1">Discount</label>
+                      <label className="block mb-1 text-sm text-gray-600">Discount</label>
                       <div className="relative">
-                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
+                        <span className="absolute text-sm text-gray-400 -translate-y-1/2 left-2 top-1/2">$</span>
                         <input
                           type="number"
                           step="0.01"
@@ -1383,11 +1363,11 @@ const ReceiptDetail: React.FC = () => {
                     </div>
                   </div>
                   <div>
-                    <label className="block text-sm text-gray-600 mb-1">Category</label>
+                    <label className="block mb-1 text-sm text-gray-600">Category</label>
                     <select
                       value={itemForm.category}
                       onChange={(e) => setItemForm({ ...itemForm, category: e.target.value })}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     >
                       {CATEGORIES.map((cat) => (
                         <option key={cat} value={cat}>
@@ -1400,7 +1380,7 @@ const ReceiptDetail: React.FC = () => {
                     <button
                       onClick={handleAddItem}
                       disabled={saving || !itemForm.name || !itemForm.unitPrice}
-                      className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50"
+                      className="px-4 py-2 font-medium text-white transition-colors bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50"
                     >
                       {saving ? 'Saving...' : 'Save Item'}
                     </button>
@@ -1416,7 +1396,7 @@ const ReceiptDetail: React.FC = () => {
                           category: 'Uncategorized',
                         });
                       }}
-                      className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg font-medium transition-colors"
+                      className="px-4 py-2 font-medium text-gray-700 transition-colors bg-gray-200 rounded-lg hover:bg-gray-300"
                     >
                       Cancel
                     </button>
@@ -1425,7 +1405,7 @@ const ReceiptDetail: React.FC = () => {
               ) : (
                 <button
                   onClick={() => setAddingItem(true)}
-                  className="w-full border-2 border-dashed border-gray-300 hover:border-gray-400 text-gray-600 hover:text-gray-700 py-3 rounded-lg font-medium flex items-center justify-center gap-2 transition-colors"
+                  className="flex items-center justify-center w-full gap-2 py-3 font-medium text-gray-600 transition-colors border-2 border-gray-300 border-dashed rounded-lg hover:border-gray-400 hover:text-gray-700"
                 >
                   <svg
                     className="w-5 h-5"
@@ -1451,7 +1431,7 @@ const ReceiptDetail: React.FC = () => {
       {/* Image Zoom Modal */}
       {imageZoomed && receipt.image_url && (
         <div
-          className="fixed inset-0 z-50 bg-black bg-opacity-90 flex items-center justify-center p-4 cursor-zoom-out"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-90 cursor-zoom-out"
           onClick={() => setImageZoomed(false)}
           role="dialog"
           aria-modal="true"
@@ -1460,10 +1440,10 @@ const ReceiptDetail: React.FC = () => {
           <img
             src={receipt.image_url.startsWith('data:') ? receipt.image_url : `${API_BASE_URL}${receipt.image_url}`}
             alt={`Zoomed receipt from ${receipt.store_name || 'Store'}`}
-            className="max-w-full max-h-full object-contain"
+            className="object-contain max-w-full max-h-full"
           />
           <button
-            className="absolute top-4 right-4 text-white hover:text-gray-300"
+            className="absolute text-white top-4 right-4 hover:text-gray-300"
             onClick={() => setImageZoomed(false)}
           >
             <svg
@@ -1485,11 +1465,11 @@ const ReceiptDetail: React.FC = () => {
 
       {/* Delete Confirmation Modal */}
       {deleteModalOpen && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="delete-receipt-title">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" role="dialog" aria-modal="true" aria-labelledby="delete-receipt-title">
+          <div className="w-full max-w-md p-6 bg-white rounded-lg shadow-xl">
             {/* Warning Icon */}
             <svg
-              className="w-12 h-12 text-red-600 mx-auto mb-4"
+              className="w-12 h-12 mx-auto mb-4 text-red-600"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -1504,27 +1484,27 @@ const ReceiptDetail: React.FC = () => {
             </svg>
 
             {/* Modal Content */}
-            <h2 id="delete-receipt-title" className="text-xl font-bold text-gray-800 text-center mb-2">
+            <h2 id="delete-receipt-title" className="mb-2 text-xl font-bold text-center text-gray-800">
               Delete Receipt?
             </h2>
-            <p className="text-gray-600 text-center mb-4">
+            <p className="mb-4 text-center text-gray-600">
               Are you sure you want to delete this receipt? This action cannot
               be undone. All items will also be deleted.
             </p>
 
             {/* Receipt Preview */}
-            <div className="bg-gray-50 rounded-lg p-3 mb-6">
+            <div className="p-3 mb-6 rounded-lg bg-gray-50">
               <p className="font-medium text-gray-800">
                 {receipt.store_name || 'Store'}
               </p>
               <p className="text-sm text-gray-600">
                 {formatDate(receipt.purchase_date)}
               </p>
-              <p className="text-green-600 font-bold">
+              <p className="font-bold text-green-600">
                 {formatCurrency(receipt.total_amount)}
               </p>
               {receipt.items && receipt.items.length > 0 && (
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="mt-1 text-xs text-gray-500">
                   {receipt.items.reduce((sum, item) => sum + (item.quantity || 1), 0)} item
                   {receipt.items.reduce((sum, item) => sum + (item.quantity || 1), 0) !== 1 ? 's' : ''}
                 </p>
@@ -1536,7 +1516,7 @@ const ReceiptDetail: React.FC = () => {
               <button
                 onClick={handleDeleteCancel}
                 disabled={deleting}
-                className="flex-1 px-4 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-medium transition-colors disabled:opacity-50"
+                className="flex-1 px-4 py-3 font-medium text-gray-700 transition-colors bg-gray-200 rounded-lg hover:bg-gray-300 disabled:opacity-50"
               >
                 Cancel
               </button>
@@ -1544,7 +1524,7 @@ const ReceiptDetail: React.FC = () => {
                 onClick={handleDeleteConfirm}
                 disabled={deleting}
                 autoFocus
-                className="flex-1 px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                className="flex items-center justify-center flex-1 gap-2 px-4 py-3 font-medium text-white transition-colors bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50"
               >
                 {deleting ? (
                   <>
@@ -1580,11 +1560,11 @@ const ReceiptDetail: React.FC = () => {
 
       {/* Delete Item Confirmation Modal */}
       {deleteItemModalOpen && itemToDelete && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="delete-item-title">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" role="dialog" aria-modal="true" aria-labelledby="delete-item-title">
+          <div className="w-full max-w-md p-6 bg-white rounded-lg shadow-xl">
             {/* Warning Icon */}
             <svg
-              className="w-12 h-12 text-red-600 mx-auto mb-4"
+              className="w-12 h-12 mx-auto mb-4 text-red-600"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -1599,20 +1579,20 @@ const ReceiptDetail: React.FC = () => {
             </svg>
 
             {/* Modal Content */}
-            <h2 id="delete-item-title" className="text-xl font-bold text-gray-800 text-center mb-2">
+            <h2 id="delete-item-title" className="mb-2 text-xl font-bold text-center text-gray-800">
               Delete Item?
             </h2>
-            <p className="text-gray-600 text-center mb-4">
+            <p className="mb-4 text-center text-gray-600">
               Are you sure you want to delete this item? This action cannot be undone.
             </p>
 
             {/* Item Preview */}
-            <div className="bg-gray-50 rounded-lg p-3 mb-6">
+            <div className="p-3 mb-6 rounded-lg bg-gray-50">
               <p className="font-medium text-gray-800">{itemToDelete.name}</p>
               <p className="text-sm text-gray-600">
                 {formatCurrency(itemToDelete.unit_price)} × {itemToDelete.quantity}
               </p>
-              <p className="text-green-600 font-bold">
+              <p className="font-bold text-green-600">
                 {formatCurrency(itemToDelete.total_price)}
               </p>
             </div>
@@ -1622,7 +1602,7 @@ const ReceiptDetail: React.FC = () => {
               <button
                 onClick={handleDeleteItemCancel}
                 disabled={deletingItem}
-                className="flex-1 px-4 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-medium transition-colors disabled:opacity-50"
+                className="flex-1 px-4 py-3 font-medium text-gray-700 transition-colors bg-gray-200 rounded-lg hover:bg-gray-300 disabled:opacity-50"
               >
                 Cancel
               </button>
@@ -1630,7 +1610,7 @@ const ReceiptDetail: React.FC = () => {
                 onClick={handleDeleteItemConfirm}
                 disabled={deletingItem}
                 autoFocus
-                className="flex-1 px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                className="flex items-center justify-center flex-1 gap-2 px-4 py-3 font-medium text-white transition-colors bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50"
               >
                 {deletingItem ? (
                   <>
