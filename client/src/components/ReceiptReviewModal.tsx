@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useRef } from 'react';
 import { CATEGORIES } from '../constants/categories';
 import { API_BASE_URL } from '../config/api';
 
@@ -55,6 +55,7 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
   // Drag and drop state
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
   const [dragOverItemId, setDragOverItemId] = useState<string | null>(null);
+  const touchDragOverRef = useRef<string | null>(null);
 
   // Lock in initial tax amount on first render (stays constant unless manually edited)
   const [initialTax] = useState<number>(() => {
@@ -174,6 +175,45 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
     setDraggedItemId(null);
     setDragOverItemId(null);
   }, []);
+
+  // Touch handlers for mobile/tablet drag-and-drop
+  const handleTouchStart = useCallback((e: React.TouchEvent, itemId: string) => {
+    setDraggedItemId(itemId);
+    touchDragOverRef.current = null;
+  }, []);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    e.preventDefault();
+    const touch = e.touches[0];
+    const el = document.elementFromPoint(touch.clientX, touch.clientY);
+    const row = el?.closest('[data-item-id]');
+    const hoveredId = row?.getAttribute('data-item-id') || null;
+    if (hoveredId !== touchDragOverRef.current) {
+      touchDragOverRef.current = hoveredId;
+      setDragOverItemId(hoveredId);
+    }
+  }, []);
+
+  const handleTouchEnd = useCallback(() => {
+    const fromId = draggedItemId;
+    const toId = touchDragOverRef.current;
+
+    setDraggedItemId(null);
+    setDragOverItemId(null);
+    touchDragOverRef.current = null;
+
+    if (!fromId || !toId || fromId === toId) return;
+
+    setFormData(prev => {
+      const draggedIndex = prev.items.findIndex(item => item.id === fromId);
+      const dropIndex = prev.items.findIndex(item => item.id === toId);
+      if (draggedIndex === -1 || dropIndex === -1) return prev;
+      const newItems = [...prev.items];
+      const [draggedItem] = newItems.splice(draggedIndex, 1);
+      newItems.splice(dropIndex, 0, draggedItem);
+      return { ...prev, items: newItems };
+    });
+  }, [draggedItemId]);
 
   // Add new item
   const handleAddItem = () => {
@@ -423,6 +463,7 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
                   {formData.items.map((item) => (
                     <div
                       key={item.id}
+                      data-item-id={item.id}
                       draggable
                       onDragStart={(e) => handleDragStart(e, item.id)}
                       onDragOver={(e) => handleDragOver(e, item.id)}
@@ -436,7 +477,13 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
                       }`}
                     >
                       {/* Drag handle - left side */}
-                      <div className="absolute left-2 top-2 text-gray-400 hover:text-gray-600 cursor-move" title="Drag to reorder">
+                      <div
+                        className="absolute left-2 top-2 text-gray-400 hover:text-gray-600 cursor-move touch-none"
+                        title="Drag to reorder"
+                        onTouchStart={(e) => handleTouchStart(e, item.id)}
+                        onTouchMove={handleTouchMove}
+                        onTouchEnd={handleTouchEnd}
+                      >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
                         </svg>

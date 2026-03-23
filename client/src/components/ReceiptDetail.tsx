@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { CATEGORIES } from '../constants/categories';
 import { API_BASE_URL } from '../config/api';
@@ -112,6 +112,7 @@ const ReceiptDetail: React.FC = () => {
   // Drag and drop state
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
   const [dragOverItemId, setDragOverItemId] = useState<string | null>(null);
+  const touchDragOverRef = useRef<string | null>(null); // tracks hovered item during touch drag
 
   // Lock in initial tax when receipt loads (stays constant unless manually edited)
   const [lockedTax, setLockedTax] = useState<number>(0);
@@ -567,6 +568,61 @@ const ReceiptDetail: React.FC = () => {
     setDraggedItemId(null);
     setDragOverItemId(null);
   }, []);
+
+  // Touch handlers for mobile/tablet drag-and-drop
+  const handleTouchStart = useCallback((e: React.TouchEvent, itemId: string) => {
+    setDraggedItemId(itemId);
+    touchDragOverRef.current = null;
+  }, []);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    e.preventDefault(); // prevent page scroll while dragging
+    const touch = e.touches[0];
+    const el = document.elementFromPoint(touch.clientX, touch.clientY);
+    const row = el?.closest('[data-item-id]');
+    const hoveredId = row?.getAttribute('data-item-id') || null;
+    if (hoveredId !== touchDragOverRef.current) {
+      touchDragOverRef.current = hoveredId;
+      setDragOverItemId(hoveredId);
+    }
+  }, []);
+
+  const handleTouchEnd = useCallback(async () => {
+    const fromId = draggedItemId;
+    const toId = touchDragOverRef.current;
+
+    setDraggedItemId(null);
+    setDragOverItemId(null);
+    touchDragOverRef.current = null;
+
+    if (!fromId || !toId || fromId === toId || !receipt) return;
+
+    const draggedIndex = sortedItems.findIndex(item => item.id === fromId);
+    const dropIndex = sortedItems.findIndex(item => item.id === toId);
+    if (draggedIndex === -1 || dropIndex === -1) return;
+
+    const newItems = [...sortedItems];
+    const [draggedItem] = newItems.splice(draggedIndex, 1);
+    newItems.splice(dropIndex, 0, draggedItem);
+
+    const itemOrderUpdates = newItems.map((item, index) => ({ id: item.id, item_order: index }));
+    setReceipt({ ...receipt, items: newItems });
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/api/items/reorder?receiptId=${id}`, {
+        method: 'PATCH',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items: itemOrderUpdates }),
+      });
+      if (!response.ok) throw new Error('Failed to reorder items');
+      await fetchReceipt();
+    } catch (err) {
+      console.error('Error reordering items:', err);
+      alert('Failed to reorder items');
+      await fetchReceipt();
+    }
+  }, [draggedItemId, sortedItems, receipt, id, fetchReceipt]);
 
   // Calculate subtotal from items safely
   const calculateSubtotal = () => {
@@ -1099,6 +1155,7 @@ const ReceiptDetail: React.FC = () => {
                   {sortedItems.map((item) => (
                     <div
                       key={item.id}
+                      data-item-id={item.id}
                       draggable={itemSortBy === 'receipt'}
                       onDragStart={itemSortBy === 'receipt' ? (e) => handleDragStart(e, item.id) : undefined}
                       onDragOver={itemSortBy === 'receipt' ? (e) => handleDragOver(e, item.id) : undefined}
@@ -1218,7 +1275,13 @@ const ReceiptDetail: React.FC = () => {
                         // View Mode
                         <div className="flex items-start justify-between">
                           {itemSortBy === 'receipt' && (
-                            <div className="mt-0.5 mr-2 text-gray-400 cursor-move hover:text-gray-600 shrink-0" title="Drag to reorder">
+                            <div
+                              className="mt-0.5 mr-2 text-gray-400 cursor-move hover:text-gray-600 shrink-0 touch-none"
+                              title="Drag to reorder"
+                              onTouchStart={(e) => handleTouchStart(e, item.id)}
+                              onTouchMove={handleTouchMove}
+                              onTouchEnd={handleTouchEnd}
+                            >
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
                               </svg>
