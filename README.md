@@ -11,7 +11,6 @@ Receipt tracking application with OCR-powered receipt scanning. Upload a photo o
 - **Duplicate Detection** — Warns when uploading a receipt that matches an existing one
 - **Analytics** — Spending insights across categories and time
 - **Magic Link Auth** — Passwordless login via email link (in addition to password login)
-- **Guest Mode** — Scan a receipt without an account; create one to save it
 
 ## Tech Stack
 

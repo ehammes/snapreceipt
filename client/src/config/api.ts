@@ -21,6 +21,9 @@ export const API_ENDPOINTS = {
   UPLOAD: `${API_BASE_URL}/api/receipts/upload`,
   SAVE_GUEST: `${API_BASE_URL}/api/receipts/save-guest`,
 
+  // Email
+  EMAIL_SEND_SUMMARY: `${API_BASE_URL}/api/email/send-summary`,
+
   // Analytics (consolidated: use ?type=)
   ANALYTICS_SUMMARY: `${API_BASE_URL}/api/analytics?type=summary`,
   ANALYTICS_SUMMARY_METRICS: `${API_BASE_URL}/api/analytics?type=summary-metrics`,

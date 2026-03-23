@@ -7,6 +7,7 @@ import authRoutes from './routes/auth';
 import receiptsRoutes from './routes/receipts';
 import analyticsRoutes from './routes/analytics';
 import itemsRoutes from './routes/items';
+import emailRoutes from './routes/email';
 import { initializeDatabase } from './config/database';
 
 dotenv.config();
@@ -51,6 +52,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/receipts', receiptsRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/items', itemsRoutes);
+app.use('/api/email', emailRoutes);
 
 // Health check route
 app.get('/api/health', (_req: Request, res: Response) => {

@@ -1,15 +1,6 @@
 import { Resend } from 'resend';
 
-// From address — update to your verified Resend domain in production
 const FROM_ADDRESS = process.env.RESEND_FROM_EMAIL || 'SnapReceipt <onboarding@resend.dev>';
-
-export interface SpendingSummaryData {
-  totalSpent: number;
-  receiptCount: number;
-  categoryBreakdown: Array<{ category: string; totalSpent: number }>;
-  topItems: Array<{ name: string; totalSpent: number; purchaseCount: number }>;
-  frontendUrl: string;
-}
 
 export const sendMagicLink = async (email: string, link: string): Promise<void> => {
   const resend = new Resend(process.env.RESEND_API_KEY);
@@ -39,6 +30,14 @@ export const sendMagicLink = async (email: string, link: string): Promise<void> 
     `,
   });
 };
+
+export interface SpendingSummaryData {
+  totalSpent: number;
+  receiptCount: number;
+  categoryBreakdown: Array<{ category: string; totalSpent: number }>;
+  topItems: Array<{ name: string; totalSpent: number; purchaseCount: number }>;
+  frontendUrl: string;
+}
 
 export const sendSpendingSummary = async (email: string, data: SpendingSummaryData): Promise<void> => {
   const resend = new Resend(process.env.RESEND_API_KEY);

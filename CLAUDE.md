@@ -41,7 +41,7 @@ npm run build    # Production build
 - **Backend**: Express + TypeScript + PostgreSQL, deployed as Vercel serverless functions
 - **OCR**: Google Cloud Vision API for receipt text extraction
 - **Auth**: JWT-based authentication with magic link (passwordless) support via Resend
-- **Email**: Resend (transactional email for magic links)
+- **Email**: Resend (transactional email for magic links and spending summaries)
 
 ### Architecture Decisions
 
@@ -92,6 +92,15 @@ Passwordless login flow via email:
 - `MagicLink.tsx` verifies token via API, stores JWT in localStorage, redirects to `/receipts`
 - Token expiry is checked in JavaScript (not SQL `NOW()`) to avoid Neon timezone ambiguity
 - Uses `useRef` guard against React StrictMode double-fire in development
+
+### Spending Summary Email
+Users can email themselves a spending summary from the Analytics dashboard:
+- "Email Summary" button in `AnalyticsDashboard.tsx` POSTs to `POST /api/email/send-summary`
+- Endpoint queries total spent, category breakdown (top 5), and top 3 items for the user
+- Sends a branded HTML email via Resend matching the magic link email style
+- Implemented in both `server/src/routes/email.ts` and `client/api/email/send-summary.ts`
+- Shared email functions live in `client/api/lib/emailService.ts` (Vercel) and `server/src/services/emailService.ts` (Express)
+- **Note**: Resend free plan can only send to the account owner's email. Verify a custom domain and set `RESEND_FROM_EMAIL` to send to any user.
 
 ### Duplicate Receipt Detection
 When a receipt is uploaded, the server checks for an existing receipt with the same store name (case-insensitive), purchase date, and total amount (within $0.01) before saving:
@@ -182,6 +191,9 @@ Full page view for saved receipts:
 #### Auth
 - `POST /api/auth/forgot-password` — Send magic link email
 - `GET /api/auth/magic-link?token=xxx` — Verify token, return JWT
+
+#### Email
+- `POST /api/email/send-summary` — Send spending summary email to authenticated user
 
 #### Items
 - `PUT /api/items/:itemId?receiptId=xxx` - Update item details
