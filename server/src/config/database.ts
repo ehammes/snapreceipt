@@ -96,6 +96,18 @@ export const initializeDatabase = async (): Promise<void> => {
     await client.query('CREATE INDEX IF NOT EXISTS idx_items_category ON items(category)');
     await client.query('CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)');
 
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS magic_link_tokens (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        token VARCHAR(255) UNIQUE NOT NULL,
+        expires_at TIMESTAMP NOT NULL,
+        used BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    await client.query('CREATE INDEX IF NOT EXISTS idx_magic_link_tokens_token ON magic_link_tokens(token)');
+
     console.log('Database tables initialized successfully');
   } catch (error) {
     console.error('Database initialization error:', error);

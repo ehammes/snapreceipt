@@ -47,6 +47,16 @@ ALTER TABLE items ADD COLUMN IF NOT EXISTS discount DECIMAL(10,2) DEFAULT 0;
 -- Add tax_amount column if table already exists without it
 ALTER TABLE receipts ADD COLUMN IF NOT EXISTS tax_amount DECIMAL(10,2);
 
+-- Create magic link tokens table
+CREATE TABLE IF NOT EXISTS magic_link_tokens (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token VARCHAR(255) UNIQUE NOT NULL,
+    expires_at TIMESTAMP NOT NULL,
+    used BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Create indexes for better query performance
 CREATE INDEX IF NOT EXISTS idx_receipts_user_id ON receipts(user_id);
 CREATE INDEX IF NOT EXISTS idx_receipts_purchase_date ON receipts(purchase_date);

@@ -10,6 +10,8 @@ export const API_ENDPOINTS = {
   // Auth - different patterns for local Express vs Vercel serverless
   LOGIN: isLocalDev ? `${API_BASE_URL}/api/auth/login` : `${API_BASE_URL}/api/auth?action=login`,
   REGISTER: isLocalDev ? `${API_BASE_URL}/api/auth/register` : `${API_BASE_URL}/api/auth?action=register`,
+  FORGOT_PASSWORD: isLocalDev ? `${API_BASE_URL}/api/auth/forgot-password` : `${API_BASE_URL}/api/auth?action=forgot-password`,
+  MAGIC_LINK: isLocalDev ? `${API_BASE_URL}/api/auth/magic-link` : `${API_BASE_URL}/api/auth?action=magic-link`,
 
   // Receipts
   RECEIPTS: `${API_BASE_URL}/api/receipts`,

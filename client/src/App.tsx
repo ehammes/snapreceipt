@@ -9,6 +9,8 @@ import ReceiptDetail from './components/ReceiptDetail';
 import AnalyticsDashboard from './components/AnalyticsDashboard';
 import Login from './components/Login';
 import Register from './components/Register';
+import ForgotPassword from './components/ForgotPassword';
+import MagicLink from './components/MagicLink';
 
 interface Receipt {
   id: string;
@@ -471,7 +473,7 @@ const Home = () => {
 // Layout wrapper to conditionally show navigation and footer
 const AppLayout = () => {
   const location = useLocation();
-  const hideNavFooterRoutes = ['/register', '/login'];
+  const hideNavFooterRoutes = ['/register', '/login', '/forgot-password', '/magic-link'];
   const showNavFooter = !hideNavFooterRoutes.includes(location.pathname);
 
   return (
@@ -482,6 +484,8 @@ const AppLayout = () => {
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/magic-link" element={<MagicLink />} />
           <Route path="/upload" element={<ReceiptUpload />} />
           <Route path="/dashboard" element={<AnalyticsDashboard />} />
           <Route path="/receipts" element={<ReceiptGallery />} />
