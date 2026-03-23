@@ -478,14 +478,16 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
                     >
                       {/* Drag handle - left side */}
                       <div
-                        className="absolute left-2 top-2 text-gray-400 hover:text-gray-600 cursor-move touch-none"
+                        className="absolute left-0 top-0 bottom-0 flex items-center px-2 text-gray-400 hover:text-gray-600 cursor-move touch-none active:text-blue-500"
                         title="Drag to reorder"
                         onTouchStart={(e) => handleTouchStart(e, item.id)}
                         onTouchMove={handleTouchMove}
                         onTouchEnd={handleTouchEnd}
                       >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                          <circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/>
+                          <circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/>
+                          <circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/>
                         </svg>
                       </div>
 

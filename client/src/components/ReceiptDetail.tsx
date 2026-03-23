@@ -1276,14 +1276,16 @@ const ReceiptDetail: React.FC = () => {
                         <div className="flex items-start justify-between">
                           {itemSortBy === 'receipt' && (
                             <div
-                              className="mt-0.5 mr-2 text-gray-400 cursor-move hover:text-gray-600 shrink-0 touch-none"
+                              className="flex items-center self-stretch px-2 mr-1 -ml-1 text-gray-400 cursor-move hover:text-gray-600 shrink-0 touch-none active:text-blue-500"
                               title="Drag to reorder"
                               onTouchStart={(e) => handleTouchStart(e, item.id)}
                               onTouchMove={handleTouchMove}
                               onTouchEnd={handleTouchEnd}
                             >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+                              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                                <circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/>
+                                <circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/>
+                                <circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/>
                               </svg>
                             </div>
                           )}
