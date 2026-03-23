@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import pool from '../lib/db';
 import { verifyToken } from '../lib/auth';
-import { processReceipt } from '../lib/ocrService';
+import ocrService from '../lib/ocrService';
 
 export const config = {
   api: {
@@ -39,7 +39,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Process with OCR
     let ocrData;
     try {
-      ocrData = await processReceipt(imageBuffer);
+      ocrData = await ocrService.processReceipt(imageBuffer);
     } catch (ocrError) {
       console.error('OCR processing failed:', ocrError);
       ocrData = {
