@@ -1,9 +1,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import bcrypt from 'bcrypt';
 import crypto from 'crypto';
-import pool from './lib/db';
-import { generateToken, verifyToken } from './lib/auth';
-import { sendMagicLink, sendSpendingSummary } from './lib/emailService';
+import pool from './_lib/db';
+import { generateToken, verifyToken } from './_lib/auth';
+import { sendMagicLink, sendSpendingSummary } from './_lib/emailService';
 
 const SALT_ROUNDS = 10;
 

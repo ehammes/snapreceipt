@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import pool from '../lib/db';
-import { verifyToken } from '../lib/auth';
+import pool from '../_lib/db';
+import { verifyToken } from '../_lib/auth';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', process.env.FRONTEND_URL || '*');

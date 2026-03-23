@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import pool from './lib/db';
-import { verifyToken } from './lib/auth';
+import pool from './_lib/db';
+import { verifyToken } from './_lib/auth';
 
 function formatMonth(yearMonth: string): string {
   const [year, month] = yearMonth.split('-');

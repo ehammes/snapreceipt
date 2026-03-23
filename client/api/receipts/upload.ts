@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import pool from '../lib/db';
-import { verifyToken } from '../lib/auth';
-import ocrService from '../lib/ocrService';
+import pool from '../_lib/db';
+import { verifyToken } from '../_lib/auth';
+import ocrService from '../_lib/ocrService';
 
 export const config = {
   api: {
