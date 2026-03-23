@@ -62,7 +62,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     try {
       const result = await pool.query(
-        `SELECT * FROM magic_link_tokens WHERE token = $1 AND used = false AND expires_at > NOW()`,
+        `SELECT * FROM magic_link_tokens WHERE token = $1 AND used = false`,
         [token]
       );
 
@@ -71,6 +71,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       const magicToken = result.rows[0];
+
+      // Check expiry in JS to avoid PostgreSQL timezone ambiguity
+      if (new Date(magicToken.expires_at + 'Z') < new Date()) {
+        return res.status(400).json({ error: 'Link is invalid or has expired' });
+      }
       await pool.query(`UPDATE magic_link_tokens SET used = true WHERE id = $1`, [magicToken.id]);
 
       const jwt_token = generateToken(magicToken.user_id);

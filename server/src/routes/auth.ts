@@ -162,9 +162,9 @@ router.get('/magic-link', async (req: Request, res: Response): Promise<void> => 
       return;
     }
 
-    // Look up the token — must be unused and not expired
+    // Look up the token — must be unused
     const result = await pool.query(
-      `SELECT * FROM magic_link_tokens WHERE token = $1 AND used = false AND expires_at > NOW()`,
+      `SELECT * FROM magic_link_tokens WHERE token = $1 AND used = false`,
       [token]
     );
 
@@ -174,6 +174,12 @@ router.get('/magic-link', async (req: Request, res: Response): Promise<void> => 
     }
 
     const magicToken = result.rows[0];
+
+    // Check expiry in JS to avoid PostgreSQL timezone ambiguity
+    if (new Date(magicToken.expires_at + 'Z') < new Date()) {
+      res.status(400).json({ error: 'Link is invalid or has expired' });
+      return;
+    }
 
     // Mark token as used
     await pool.query(`UPDATE magic_link_tokens SET used = true WHERE id = $1`, [magicToken.id]);
