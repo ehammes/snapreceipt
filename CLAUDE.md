@@ -40,7 +40,8 @@ npm run build    # Production build
 - **Frontend**: React + TypeScript, hosted on Vercel
 - **Backend**: Express + TypeScript + PostgreSQL, deployed as Vercel serverless functions
 - **OCR**: Google Cloud Vision API for receipt text extraction
-- **Auth**: JWT-based authentication
+- **Auth**: JWT-based authentication with magic link (passwordless) support via Resend
+- **Email**: Resend (transactional email for magic links)
 
 ### Architecture Decisions
 
@@ -49,6 +50,19 @@ The backend runs on Vercel serverless functions rather than a separate server pl
 - **Cost savings**: Free tier sufficient for most usage
 - **Simplified deployment**: Single platform for both frontend and backend
 - **Auto-scaling**: Serverless functions scale automatically
+
+#### Vercel Serverless vs Express — Two Separate Codebases
+The project has TWO backend implementations that must be kept in sync:
+- `client/api/` — Vercel serverless functions (used in **production**)
+- `server/src/routes/` — Express routes (used in **local development**)
+
+**Critical**: Any new API endpoint or auth feature must be added to BOTH. The Express server uses `initializeDatabase()` on startup for DB migrations; Vercel has no startup hook, so table creation must be done manually in the Neon console or handled in `client/api/lib/db.ts`.
+
+**Auth endpoint pattern difference**:
+- Local Express: `/api/auth/login`, `/api/auth/register`, etc.
+- Vercel: `/api/auth?action=login`, `/api/auth?action=register`, etc.
+
+This is handled in `client/src/config/api.ts` via the `isLocalDev` flag.
 
 #### Duplicated OCR Logic
 OCR parsing logic exists in both:
@@ -70,11 +84,30 @@ OCR parsing logic exists in both:
 - Handles discounts, tax extraction, store information
 - ~67% accuracy on item ordering (known limitation)
 
+### Magic Link Authentication
+Passwordless login flow via email:
+- User submits email on `/forgot-password`
+- Server generates a one-time token (64 hex chars), stores in `magic_link_tokens` table with 1-hour expiry
+- Resend sends branded email with link to `/magic-link?token=xxx`
+- `MagicLink.tsx` verifies token via API, stores JWT in localStorage, redirects to `/receipts`
+- Token expiry is checked in JavaScript (not SQL `NOW()`) to avoid Neon timezone ambiguity
+- Uses `useRef` guard against React StrictMode double-fire in development
+
+### Duplicate Receipt Detection
+When a receipt is uploaded, the server checks for an existing receipt with the same store name (case-insensitive), purchase date, and total amount (within $0.01) before saving:
+- If a duplicate is found, the upload still succeeds and the review modal shows an amber warning banner
+- Banner includes the existing receipt's store/date/total and a "View it →" link (opens in new tab)
+- Dismissable — user can still save the new receipt if it's intentional
+- Check is wrapped in try/catch so a DB error never blocks the upload
+- Implemented in both `server/src/routes/receipts.ts` and `client/api/receipts/upload.ts`
+
 ### Manual Drag-and-Drop Reordering
 Users can reorder items to match physical receipt:
-- **ReceiptReviewModal**: Reorder during initial upload
-- **ReceiptDetail**: Reorder on saved receipts
-- Changes persist to database via `PATCH /api/items/reorder`
+- **ReceiptReviewModal**: Reorder during initial upload (local state only)
+- **ReceiptDetail**: Reorder on saved receipts (persists immediately via `PATCH /api/items/reorder`)
+- Supports both mouse (HTML5 Drag API) and touch (touch events with `elementFromPoint`)
+- Touch handlers are on the drag handle only — normal item touches still scroll
+- `data-item-id` attribute on each row enables touch target detection during drag
 
 ### Receipt Review & Editing
 - Review OCR results before saving
@@ -91,6 +124,12 @@ Automatic and manual categorization using predefined categories in `client/src/c
 ### Users Table
 ```sql
 id (UUID), email, password_hash, created_at
+```
+
+### Magic Link Tokens Table
+```sql
+id (UUID), user_id (FK → users), token VARCHAR(255) UNIQUE,
+expires_at TIMESTAMP, used BOOLEAN DEFAULT FALSE, created_at TIMESTAMP
 ```
 
 ### Receipts Table
@@ -139,6 +178,10 @@ Full page view for saved receipts:
 - `GET /api/receipts/:id` - Get single receipt with items
 - `PUT /api/receipts/:id` - Update receipt details
 - `DELETE /api/receipts/:id` - Delete receipt
+
+#### Auth
+- `POST /api/auth/forgot-password` — Send magic link email
+- `GET /api/auth/magic-link?token=xxx` — Verify token, return JWT
 
 #### Items
 - `PUT /api/items/:itemId?receiptId=xxx` - Update item details
@@ -196,21 +239,40 @@ calculateTotalPrice(unitPrice, quantity, discount)
 
 ### Common Pitfalls
 
-#### 1. Forgetting to Update Both OCR Services
+#### 1. Forgetting to Update Both Backends
+Any change to API behavior must be applied to BOTH:
+- `client/api/` (Vercel serverless — production)
+- `server/src/routes/` (Express — local dev)
+
+Failing to do this causes features to work locally but break in production.
+
+#### 2. Forgetting to Update Both OCR Services
 When changing OCR logic, update BOTH:
 - `client/api/lib/ocrService.ts`
 - `server/src/services/ocrService.ts`
 
-#### 2. Not Capping Discounts
+#### 3. Not Capping Discounts
 Always use `calculateTotalPrice()` helper to prevent negative item totals
 
-#### 3. OCR Item Ordering
+#### 4. OCR Item Ordering
 Don't rely on OCR extraction order matching physical receipt order. Users must manually reorder if needed.
 
-#### 4. Tax Calculation
+#### 5. Tax Calculation
 Tax is locked at initial OCR extraction value unless manually overridden. Item changes don't recalculate tax automatically.
 
-#### 5. Floating Point Precision
+#### 6. Neon Timezone Bug
+Do NOT use `expires_at > NOW()` in SQL for token expiry checks — Neon session timezone settings can cause valid tokens to appear expired. Check expiry in JavaScript instead:
+```typescript
+if (new Date(row.expires_at + 'Z') < new Date()) { /* expired */ }
+```
+
+#### 7. Google Vision API Requires Billing
+The Vision API returns `PERMISSION_DENIED` if billing is not enabled on the Google Cloud project, even with valid credentials. OCR will silently fall back to empty data. If OCR stops working unexpectedly, check billing at console.cloud.google.com before debugging code.
+
+#### 8. Vercel Has No Startup Hook
+Unlike the Express server (which runs `initializeDatabase()` on start), Vercel serverless functions have no startup lifecycle. New tables must be created manually in the Neon console.
+
+#### 9. Floating Point Precision
 Always round currency to 2 decimal places:
 ```typescript
 Math.round(value * 100) / 100
@@ -219,19 +281,25 @@ Math.round(value * 100) / 100
 ### File Modification Checklist
 
 When updating features:
+- [ ] Update **both backends** (`client/api/` and `server/src/routes/`) if changing API behavior
 - [ ] Update both OCR services if changing parsing logic
 - [ ] Update TypeScript interfaces if changing data structures
-- [ ] Update database models if changing schema
+- [ ] Create new DB tables manually in Neon console (don't rely on Vercel auto-init)
 - [ ] Add/update tests for new business logic
 - [ ] Test on multiple receipt formats
-- [ ] Verify drag-and-drop still works after item list changes
+- [ ] Verify drag-and-drop still works on both desktop and mobile after item list changes
 
 ## Environment Variables
 
 See `server/.env.example` for required variables:
-- `DATABASE_URL` - PostgreSQL connection string
+- `DATABASE_URL` - PostgreSQL connection string (Neon)
 - `JWT_SECRET` - Auth token signing key
 - `GOOGLE_CREDENTIALS_JSON` or `GOOGLE_APPLICATION_CREDENTIALS` - Vision API credentials
+- `RESEND_API_KEY` - Resend API key for magic link emails
+- `RESEND_FROM_EMAIL` - From address (defaults to `SnapReceipt <onboarding@resend.dev>`)
+- `FRONTEND_URL` - Used to construct magic link URLs (e.g. `https://snapreceipt.vercel.app`)
+
+**Note**: On Resend's free plan, `onboarding@resend.dev` can only send to the Resend account's own email. To send to any address, verify a custom domain in Resend and set `RESEND_FROM_EMAIL`.
 
 ## Deployment
 
