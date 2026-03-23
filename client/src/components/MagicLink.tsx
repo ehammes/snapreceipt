@@ -22,7 +22,8 @@ const MagicLink: React.FC = () => {
 
     const verify = async () => {
       try {
-        const res = await fetch(`${API_ENDPOINTS.MAGIC_LINK}?token=${encodeURIComponent(token)}`);
+        const separator = API_ENDPOINTS.MAGIC_LINK.includes('?') ? '&' : '?';
+        const res = await fetch(`${API_ENDPOINTS.MAGIC_LINK}${separator}token=${encodeURIComponent(token)}`);
         const data = await res.json();
 
         if (!res.ok) {
