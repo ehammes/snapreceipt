@@ -61,6 +61,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
+    // Check for duplicate receipt (same store + date + total) — non-fatal
+    let duplicate = null;
+    try {
+      if (ocrData.storeName && ocrData.purchaseDate && ocrData.totalAmount) {
+        const dupCheck = await pool.query(
+          `SELECT id, store_name, purchase_date, total_amount
+           FROM receipts
+           WHERE user_id = $1
+             AND LOWER(store_name) = LOWER($2)
+             AND purchase_date::date = $3::date
+             AND ABS(total_amount - $4) < 0.01
+           LIMIT 1`,
+          [userId, ocrData.storeName, ocrData.purchaseDate, ocrData.totalAmount]
+        );
+        if (dupCheck.rows.length > 0) duplicate = dupCheck.rows[0];
+      }
+    } catch (dupError) {
+      console.error('Duplicate check failed (non-fatal):', dupError);
+    }
+
     // Create receipt in database
     const receiptResult = await pool.query(
       `INSERT INTO receipts (user_id, image_url, purchase_date, total_amount, store_name, store_location, store_city, store_state, store_zip)
@@ -88,6 +108,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       success: true,
       receiptId: receipt.id,
       imageUrl: imageUrl || '',
+      duplicate,
       data: { ...receipt, items: savedItems },
     });
   } catch (error) {

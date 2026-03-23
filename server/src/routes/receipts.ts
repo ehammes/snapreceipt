@@ -82,6 +82,26 @@ router.post('/upload', optionalAuth, async (req: Request, res: Response): Promis
       return;
     }
 
+    // Check for duplicate receipt (same store + date + total) — non-fatal
+    let duplicate = null;
+    try {
+      if (ocrData.storeName && ocrData.purchaseDate && ocrData.totalAmount) {
+        const dupCheck = await pool.query(
+          `SELECT id, store_name, purchase_date, total_amount
+           FROM receipts
+           WHERE user_id = $1
+             AND LOWER(store_name) = LOWER($2)
+             AND purchase_date::date = $3::date
+             AND ABS(total_amount - $4) < 0.01
+           LIMIT 1`,
+          [req.userId, ocrData.storeName, ocrData.purchaseDate, ocrData.totalAmount]
+        );
+        if (dupCheck.rows.length > 0) duplicate = dupCheck.rows[0];
+      }
+    } catch (dupError) {
+      console.error('Duplicate check failed (non-fatal):', dupError);
+    }
+
     // Authenticated mode - save to database
     const receipt = await ReceiptModel.create({
       user_id: req.userId,
@@ -124,6 +144,7 @@ router.post('/upload', optionalAuth, async (req: Request, res: Response): Promis
       success: true,
       receiptId: receipt.id,
       imageUrl,
+      duplicate,
       data: {
         ...receipt,
         items: savedItems,

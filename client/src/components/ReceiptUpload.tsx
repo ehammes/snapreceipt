@@ -47,6 +47,7 @@ const ReceiptUpload: React.FC = () => {
   const [processing, setProcessing] = useState(false);
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [reviewData, setReviewData] = useState<ReviewData | null>(null);
+  const [duplicateReceipt, setDuplicateReceipt] = useState<{ id: string; store_name: string; purchase_date: string; total_amount: number } | null>(null);
   const [saving, setSaving] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [uploadError, setUploadError] = useState<UploadError | null>(null);
@@ -386,6 +387,7 @@ const ReceiptUpload: React.FC = () => {
         });
       }
 
+      setDuplicateReceipt(data.duplicate || null);
       setReviewData({
         ...convertToReviewData(processedData),
         receiptId,
@@ -546,6 +548,7 @@ const ReceiptUpload: React.FC = () => {
     setPreviewUrl(null);
     setShowReviewModal(false);
     setReviewData(null);
+    setDuplicateReceipt(null);
     setUploading(false);
     setCompressing(false);
     setProcessing(false);
@@ -936,6 +939,7 @@ const ReceiptUpload: React.FC = () => {
           onSave={handleSaveReview}
           onCancel={handleCancelReview}
           saving={saving}
+          duplicate={duplicateReceipt}
         />
       )}
     </div>

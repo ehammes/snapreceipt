@@ -26,11 +26,19 @@ export interface ReviewData {
   imageUrl: string;
 }
 
+interface DuplicateReceipt {
+  id: string;
+  store_name: string;
+  purchase_date: string;
+  total_amount: number;
+}
+
 interface ReceiptReviewModalProps {
   data: ReviewData;
   onSave: (data: ReviewData) => void;
   onCancel: () => void;
   saving: boolean;
+  duplicate?: DuplicateReceipt | null;
 }
 
 const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
@@ -38,10 +46,12 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
   onSave,
   onCancel,
   saving,
+  duplicate,
 }) => {
   const [formData, setFormData] = useState<ReviewData>(data);
   const [addingItem, setAddingItem] = useState(false);
   const [imageZoomed, setImageZoomed] = useState(false);
+  const [dismissedDuplicate, setDismissedDuplicate] = useState(false);
   const [newItem, setNewItem] = useState<Omit<ReviewItem, 'id'>>({
     itemNumber: '',
     name: '',
@@ -299,6 +309,40 @@ const ReceiptReviewModal: React.FC<ReceiptReviewModalProps> = ({
               </svg>
             </button>
           </div>
+
+          {/* Duplicate warning banner */}
+          {duplicate && !dismissedDuplicate && (
+            <div className="mx-4 sm:mx-6 mt-4 flex items-start gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm">
+              <svg className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div className="flex-1">
+                <span className="font-medium text-amber-800">Possible duplicate — </span>
+                <span className="text-amber-700">
+                  a receipt from <strong>{duplicate.store_name}</strong> on{' '}
+                  <strong>{new Date(duplicate.purchase_date).toLocaleDateString()}</strong> for{' '}
+                  <strong>${Number(duplicate.total_amount).toFixed(2)}</strong> already exists.
+                </span>
+                {' '}
+                <a
+                  href={`/receipts/${duplicate.id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium text-amber-800 underline hover:text-amber-900"
+                >
+                  View it →
+                </a>
+              </div>
+              <button
+                onClick={() => setDismissedDuplicate(true)}
+                className="text-amber-400 hover:text-amber-600 shrink-0"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          )}
 
           {/* Content */}
           <div className="max-h-[calc(100vh-160px)] sm:max-h-[calc(100vh-200px)] overflow-y-auto">
