@@ -243,12 +243,12 @@ describe('Constants', () => {
 
   describe('File Upload Constants', () => {
     it('defines max upload size in bytes', () => {
-      expect(MAX_UPLOAD_SIZE_BYTES).toBe(10485760); // 10MB in bytes
+      expect(MAX_UPLOAD_SIZE_BYTES).toBe(52428800); // 50MB in bytes
       expect(typeof MAX_UPLOAD_SIZE_BYTES).toBe('number');
     });
 
     it('defines max upload size display string', () => {
-      expect(MAX_UPLOAD_SIZE_DISPLAY).toBe('10mb');
+      expect(MAX_UPLOAD_SIZE_DISPLAY).toBe('50mb');
       expect(typeof MAX_UPLOAD_SIZE_DISPLAY).toBe('string');
     });
 

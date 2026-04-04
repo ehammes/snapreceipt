@@ -129,7 +129,7 @@ const ReceiptUpload: React.FC = () => {
     };
   };
 
-  // Compress image before upload
+  // Compress image before upload — targets < 3MB raw so base64 stays under Lambda's ~4MB safe limit
   const compressImage = (file: File): Promise<File> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -137,8 +137,8 @@ const ReceiptUpload: React.FC = () => {
       reader.onload = (e) => {
         const img = new Image();
         img.onload = () => {
-          // Calculate new dimensions (max 2000px on longest side)
-          const maxDimension = 2000;
+          // 1600px is sufficient for OCR; larger dimensions waste bandwidth
+          const maxDimension = 1600;
           let width = img.width;
           let height = img.height;
 
@@ -152,29 +152,37 @@ const ReceiptUpload: React.FC = () => {
             }
           }
 
-          // Create canvas and compress
           const canvas = document.createElement('canvas');
           canvas.width = width;
           canvas.height = height;
           const ctx = canvas.getContext('2d');
           ctx?.drawImage(img, 0, 0, width, height);
 
-          // Convert to blob with compression (0.85 quality for JPEG)
-          canvas.toBlob(
-            (blob) => {
-              if (blob) {
-                const compressedFile = new File([blob], file.name, {
-                  type: 'image/jpeg',
-                  lastModified: Date.now(),
-                });
-                resolve(compressedFile);
-              } else {
-                reject(new Error('Image compression failed'));
-              }
-            },
-            'image/jpeg',
-            0.85
-          );
+          // Try progressively lower quality until raw size < 3MB
+          const targetBytes = 3 * 1024 * 1024;
+          const qualities = [0.85, 0.75, 0.65, 0.5];
+          let attempt = 0;
+
+          const tryQuality = (quality: number) => {
+            canvas.toBlob(
+              (blob) => {
+                if (!blob) {
+                  reject(new Error('Image compression failed'));
+                  return;
+                }
+                if (blob.size <= targetBytes || attempt >= qualities.length - 1) {
+                  resolve(new File([blob], file.name, { type: 'image/jpeg', lastModified: Date.now() }));
+                } else {
+                  attempt++;
+                  tryQuality(qualities[attempt]);
+                }
+              },
+              'image/jpeg',
+              quality
+            );
+          };
+
+          tryQuality(qualities[0]);
         };
         img.onerror = () => reject(new Error('Failed to load image'));
         img.src = e.target?.result as string;
@@ -223,41 +231,35 @@ const ReceiptUpload: React.FC = () => {
         return;
       }
 
-      // Compress image if needed
-      let fileToUpload = file;
-      const maxSizeBytes = 5 * 1024 * 1024; // 5 MB threshold for compression
-
-      if (file.size > maxSizeBytes) {
-        setCompressing(true);
-        try {
-          fileToUpload = await compressImage(file);
-        } catch (compressionError) {
-          console.error('Image compression failed:', compressionError);
-          setUploadError({
-            type: 'server',
-            message: 'Failed to compress image. Please try a different image.',
-            canRetry: false,
-          });
-          setUploading(false);
-          setCompressing(false);
-          setProcessing(false);
-          return;
-        } finally {
-          setCompressing(false);
-        }
+      // Always compress — reduces to ≤3MB raw so base64 stays within Lambda's payload limit
+      setCompressing(true);
+      let fileToUpload: File;
+      try {
+        fileToUpload = await compressImage(file);
+      } catch (compressionError) {
+        console.error('Image compression failed:', compressionError);
+        setUploadError({
+          type: 'server',
+          message: 'Failed to compress image. Please try a different image.',
+          canRetry: false,
+        });
+        setUploading(false);
+        setCompressing(false);
+        setProcessing(false);
+        return;
+      } finally {
+        setCompressing(false);
       }
 
       // Convert file to base64
       const base64Image = await fileToBase64(fileToUpload);
 
-      // Verify the final size isn't too large
-      const finalSizeBytes = base64Image.length;
-      const maxFinalSize = 10 * 1024 * 1024; // 10 MB final limit
-
-      if (finalSizeBytes > maxFinalSize) {
+      // ~4MB base64 is the safe ceiling given Lambda's 6MB total payload limit
+      const maxFinalSize = 4 * 1024 * 1024;
+      if (base64Image.length > maxFinalSize) {
         setUploadError({
           type: 'server',
-          message: 'Image is too large even after compression. Please try a smaller image.',
+          message: 'Image is too large even after compression. Please try a smaller or lower-resolution image.',
           canRetry: false,
         });
         setUploading(false);

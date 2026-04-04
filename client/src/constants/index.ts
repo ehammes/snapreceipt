@@ -22,11 +22,11 @@ export const PRICE_STEP = 0.01;
 /** Minimum quantity for items */
 export const MIN_QUANTITY = 1;
 
-/** Maximum file upload size in bytes (10MB) */
-export const MAX_UPLOAD_SIZE_BYTES = 10 * 1024 * 1024;
+/** Maximum file upload size in bytes (50MB) — client-side compression targets ~3MB before sending */
+export const MAX_UPLOAD_SIZE_BYTES = 50 * 1024 * 1024;
 
 /** Maximum file upload size display string */
-export const MAX_UPLOAD_SIZE_DISPLAY = '10mb';
+export const MAX_UPLOAD_SIZE_DISPLAY = '50mb';
 
 // ============================================
 // DEFAULT FORM VALUES
